@@ -1,22 +1,27 @@
 import React, { useState } from 'react';
 import { 
-  Sparkles, 
+  Scale, 
   ShieldCheck, 
   Lock, 
-  BrainCircuit, 
-  History, 
-  MessageSquare, 
+  BookOpen, 
+  GitFork, 
+  FileText, 
   CheckCircle2, 
   ArrowRight,
   UserCheck,
-  AlertCircle
+  AlertCircle,
+  Columns,
+  Bookmark
 } from 'lucide-react';
+import type { SupportedLanguage } from '../types';
+import { getTranslation } from '../lib/i18n';
 
 interface LandingViewProps {
   onGoogleSignIn: () => Promise<void>;
   onGuestSignIn: () => Promise<void>;
   isLoading: boolean;
   authError: string | null;
+  language: SupportedLanguage;
 }
 
 export const LandingView: React.FC<LandingViewProps> = ({
@@ -24,28 +29,29 @@ export const LandingView: React.FC<LandingViewProps> = ({
   onGuestSignIn,
   isLoading,
   authError,
+  language,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'threat-model'>('overview');
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-4rem)] flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-stone-950 text-stone-100">
       <div className="max-w-4xl w-full space-y-8">
         
         {/* Hero Card */}
-        <div className="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-8 sm:p-12 text-center space-y-6">
+        <div className="bg-stone-900 rounded-3xl border border-stone-800 shadow-xl p-8 sm:p-12 text-center space-y-6">
           
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200/60">
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>Multi-Turn Reflections & Structured Thinking</span>
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            <Scale className="w-3.5 h-3.5 text-amber-400" />
+            <span>Zero-Hallucination Indian Legal Research Platform</span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold text-stone-900 tracking-tight leading-tight">
-            Think clearly. Converse with <span className="text-amber-700 italic">Gemini 3.6 Flash</span>.
+          <h1 className="text-3xl sm:text-5xl font-serif font-bold text-white tracking-tight leading-tight">
+            Trace the Law. <span className="text-amber-400 italic">Verify the Authority.</span>
           </h1>
 
-          <p className="max-w-2xl mx-auto text-base sm:text-lg text-stone-600 leading-relaxed font-sans">
-            A private, user-authenticated digital journal where your thoughts meet an intelligent reflection partner. 
-            All interactions are cryptographically isolated to your Firebase account in Cloud Firestore.
+          <p className="max-w-2xl mx-auto text-base sm:text-lg text-stone-300 leading-relaxed font-sans">
+            NyayaTrace strictly analyzes only authentic, verifiable Supreme Court & High Court judgments and statutory records. 
+            All ratio decidendi, case citations, and research digests are cryptographically isolated to your private Firebase account in Cloud Firestore.
           </p>
 
           {/* Authentication Actions */}
@@ -55,7 +61,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
               type="button"
               disabled={isLoading}
               onClick={onGoogleSignIn}
-              className="w-full sm:w-auto inline-flex items-center justify-center space-x-3 px-6 py-3.5 rounded-xl text-sm font-semibold text-stone-800 bg-white border border-stone-300 shadow-xs hover:bg-stone-50 active:bg-stone-100 disabled:opacity-50 transition-all cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center space-x-3 px-6 py-3.5 rounded-xl text-sm font-semibold text-stone-900 bg-white hover:bg-stone-100 active:bg-stone-200 disabled:opacity-50 transition-all cursor-pointer shadow-md"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -75,7 +81,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              <span>{isLoading ? 'Connecting...' : 'Sign in with Google'}</span>
+              <span>{isLoading ? 'Connecting...' : 'Sign In with Google (Legal Workspace)'}</span>
             </button>
 
             <button
@@ -83,49 +89,49 @@ export const LandingView: React.FC<LandingViewProps> = ({
               type="button"
               disabled={isLoading}
               onClick={onGuestSignIn}
-              className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-6 py-3.5 rounded-xl text-sm font-medium text-stone-700 bg-stone-100 hover:bg-stone-200 active:bg-stone-300 disabled:opacity-50 transition-colors cursor-pointer border border-stone-200"
+              className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 px-6 py-3.5 rounded-xl text-sm font-semibold text-stone-200 bg-stone-800 hover:bg-stone-700 active:bg-stone-600 disabled:opacity-50 transition-colors cursor-pointer border border-stone-700"
             >
-              <UserCheck className="w-4 h-4 text-stone-600" />
-              <span>Explore as Guest Member</span>
+              <UserCheck className="w-4 h-4 text-amber-400" />
+              <span>Explore as Guest Advocate</span>
             </button>
           </div>
 
           {authError && (
-            <div id="auth-error-banner" className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center justify-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <div id="auth-error-banner" className="p-3 bg-rose-950/60 border border-rose-800 rounded-xl text-xs text-rose-200 flex items-center justify-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>{authError}</span>
             </div>
           )}
 
           {/* Value pillars */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6 text-left border-t border-stone-100">
-            <div className="p-4 rounded-xl bg-stone-50/60 border border-stone-200/60 space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-                <BrainCircuit className="w-4 h-4" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-stone-800 text-left">
+            <div className="p-4 rounded-xl bg-stone-950/60 border border-stone-800 space-y-1.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                <BookOpen className="w-4 h-4" />
               </div>
-              <h3 className="text-sm font-semibold text-stone-900">Resilient Gemini 3.6 Flash</h3>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Automated multi-model fallback ladder guarantees responsive reflections and brainstorming.
+              <h4 className="text-sm font-serif font-bold text-white">Source Library & Verified Text</h4>
+              <p className="text-xs text-stone-400">
+                Ground research on authentic PDFs and SCR transcripts with provenance verification badges.
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-stone-50/60 border border-stone-200/60 space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+            <div className="p-4 rounded-xl bg-stone-950/60 border border-stone-800 space-y-1.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                <GitFork className="w-4 h-4" />
+              </div>
+              <h4 className="text-sm font-serif font-bold text-white">Interactive Case Trace</h4>
+              <p className="text-xs text-stone-400">
+                Map overruled, followed, distinguished, and cited precedents with exact verbatim quotes.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-stone-950/60 border border-stone-800 space-y-1.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                 <Lock className="w-4 h-4" />
               </div>
-              <h3 className="text-sm font-semibold text-stone-900">User Data Isolation</h3>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Rules-enforced Firestore paths (<code className="text-[11px] bg-stone-200 px-1 py-0.5 rounded">/users/$uid/*</code>) prevent cross-user data leakage.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-stone-50/60 border border-stone-200/60 space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                <History className="w-4 h-4" />
-              </div>
-              <h3 className="text-sm font-semibold text-stone-900">Multi-Turn History</h3>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Keep conversational context across sessions with automated executive synthesis and tagging.
+              <h4 className="text-sm font-serif font-bold text-white">Isolated Private Findings</h4>
+              <p className="text-xs text-stone-400">
+                Multi-turn research and executive digests scoped strictly to authenticated Firestore paths.
               </p>
             </div>
           </div>

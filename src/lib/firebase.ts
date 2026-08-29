@@ -6,7 +6,6 @@ import {
   signInWithRedirect,
   getRedirectResult,
   signOut, 
-  onAuthStateChanged,
   signInAnonymously,
   type User 
 } from 'firebase/auth';
@@ -17,14 +16,23 @@ import {
   setDoc, 
   getDocs, 
   getDoc,
+  getDocFromServer,
   deleteDoc, 
   query, 
   orderBy, 
-  serverTimestamp,
   type Firestore
 } from 'firebase/firestore';
 import firebaseConfigRaw from '../../firebase-applet-config.json';
-import type { JournalEntry, UserProfile } from '../types';
+import type { 
+  JournalEntry, 
+  UserProfile, 
+  ResearchSession, 
+  SourceDocument, 
+  CaseAnalysis, 
+  SavedFinding, 
+  ResearchDigest,
+  SupportedLanguage 
+} from '../types';
 
 const firebaseConfig = {
   apiKey: firebaseConfigRaw.apiKey,
@@ -41,9 +49,22 @@ export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getA
 export const auth = getAuth(app);
 
 // Use custom firestore database if specified in config
-export const db: Firestore = (firebaseConfigRaw as any).firestoreDatabaseId 
-  ? getFirestore(app, (firebaseConfigRaw as any).firestoreDatabaseId)
+const targetDbId = (firebaseConfigRaw as any).firestoreDatabaseId || (firebaseConfigRaw as any).databaseId;
+export const db: Firestore = targetDbId 
+  ? getFirestore(app, targetDbId)
   : getFirestore(app);
+
+// Validate Connection to Firestore on startup
+async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firestore offline status or pending connection:', error.message);
+    }
+  }
+}
+testConnection();
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -78,7 +99,6 @@ export async function loginWithGoogle(): Promise<User> {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (error: any) {
-    // If popup is blocked in iframe sandbox, attempt redirect or fallback
     console.warn('Popup sign in failed, attempting redirect/fallback:', error);
     if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/cancelled-popup-request') {
       try {
@@ -106,22 +126,20 @@ export function toUserProfile(user: User): UserProfile {
   return {
     uid: user.uid,
     email: user.email,
-    displayName: user.displayName || (user.isAnonymous ? 'Guest Member' : user.email?.split('@')[0] || 'User'),
+    displayName: user.displayName || (user.isAnonymous ? 'Guest Advocate' : user.email?.split('@')[0] || 'Advocate'),
     photoURL: user.photoURL,
     isAnonymous: user.isAnonymous,
   };
 }
 
-/**
- * Fetch all entries strictly isolated to the authenticated user's path:
- * /users/{userId}/entries/{entryId}
- */
+// ==========================================
+// PRESERVED JOURNAL METHODS (Backward Compatibility)
+// ==========================================
+
 export async function fetchUserEntries(userId: string): Promise<JournalEntry[]> {
   if (!userId) throw new Error('User ID is required to fetch journal entries.');
-  
   const entriesRef = collection(db, 'users', userId, 'entries');
   const q = query(entriesRef, orderBy('updatedAt', 'desc'));
-  
   try {
     const snapshot = await getDocs(q);
     const entries: JournalEntry[] = [];
@@ -148,47 +166,237 @@ export async function fetchUserEntries(userId: string): Promise<JournalEntry[]> 
   }
 }
 
-/**
- * Save or update a journal entry strictly isolated to the authenticated user's path:
- * /users/{userId}/entries/{entryId}
- */
 export async function saveUserEntry(userId: string, entry: JournalEntry): Promise<void> {
   if (!userId) throw new Error('User ID is required to save entry.');
   if (!entry.id) throw new Error('Entry ID is required.');
-
   const entryRef = doc(db, 'users', userId, 'entries', entry.id);
   const payload = sanitizeFirestorePayload({
     ...entry,
     userId,
     updatedAt: Date.now(),
   });
-
   await setDoc(entryRef, payload, { merge: true });
-
-  // Also record a mirror interaction log to /users/{userId}/interactions/{interactionId} for auditing & compliance
-  if (entry.interactions && entry.interactions.length > 0) {
-    const latestInteraction = entry.interactions[entry.interactions.length - 1];
-    if (latestInteraction) {
-      const interactionRef = doc(db, 'users', userId, 'interactions', latestInteraction.id || `${entry.id}_${Date.now()}`);
-      await setDoc(interactionRef, sanitizeFirestorePayload({
-        entryId: entry.id,
-        entryTitle: entry.title,
-        userId,
-        prompt: latestInteraction.role === 'user' ? latestInteraction.content : '',
-        response: latestInteraction.role === 'assistant' ? latestInteraction.content : '',
-        mode: latestInteraction.mode || entry.mode || 'reflection',
-        modelUsed: latestInteraction.modelUsed || 'gemini-3.6-flash',
-        timestamp: latestInteraction.timestamp || Date.now(),
-      }), { merge: true });
-    }
-  }
 }
 
-/**
- * Delete a journal entry isolated to the authenticated user's path
- */
 export async function deleteUserEntry(userId: string, entryId: string): Promise<void> {
   if (!userId || !entryId) throw new Error('User ID and Entry ID are required to delete entry.');
   const entryRef = doc(db, 'users', userId, 'entries', entryId);
   await deleteDoc(entryRef);
+}
+
+// ==========================================
+// NYAYATRACE FIRESTORE METHODS
+// ==========================================
+
+/**
+ * Fetch all research sessions strictly scoped to the authenticated user: /users/{userId}/researchSessions/{sessionId}
+ */
+export async function fetchUserSessions(userId: string): Promise<ResearchSession[]> {
+  if (!userId) throw new Error('User ID is required.');
+  const collRef = collection(db, 'users', userId, 'researchSessions');
+  const q = query(collRef, orderBy('updatedAt', 'desc'));
+  const snapshot = await getDocs(q);
+  const list: ResearchSession[] = [];
+  snapshot.forEach(d => {
+    const data = d.data();
+    list.push({
+      id: d.id,
+      userId: data.userId || userId,
+      title: data.title || 'Untitled Research',
+      researchQuestion: data.researchQuestion || '',
+      legalTopic: data.legalTopic || 'General Law',
+      notes: data.notes || '',
+      sourceDocumentIds: data.sourceDocumentIds || data.attachedSourceIds || [],
+      messages: data.messages || [],
+      caseTraceIds: data.caseTraceIds || data.caseTraceRelationships || [],
+      createdAt: data.createdAt || Date.now(),
+      updatedAt: data.updatedAt || Date.now(),
+    });
+  });
+  return list;
+}
+
+export async function saveUserSession(userId: string, session: ResearchSession): Promise<void> {
+  if (!userId || !session.id) throw new Error('User ID and Session ID required.');
+  const docRef = doc(db, 'users', userId, 'researchSessions', session.id);
+  const payload = sanitizeFirestorePayload({
+    ...session,
+    userId,
+    updatedAt: Date.now(),
+  });
+  await setDoc(docRef, payload, { merge: true });
+}
+
+export async function deleteUserSession(userId: string, sessionId: string): Promise<void> {
+  if (!userId || !sessionId) throw new Error('User ID and Session ID required.');
+  const docRef = doc(db, 'users', userId, 'researchSessions', sessionId);
+  await deleteDoc(docRef);
+}
+
+/**
+ * Source Library Operations: /users/{userId}/sources/{sourceId}
+ */
+export async function fetchUserSources(userId: string): Promise<SourceDocument[]> {
+  if (!userId) throw new Error('User ID is required.');
+  const collRef = collection(db, 'users', userId, 'sources');
+  const q = query(collRef, orderBy('updatedAt', 'desc'));
+  const snapshot = await getDocs(q);
+  const list: SourceDocument[] = [];
+  snapshot.forEach(d => {
+    const data = d.data();
+    list.push({
+      id: d.id,
+      userId: data.userId || userId,
+      sessionId: data.sessionId,
+      title: data.title || 'Untitled Document',
+      sourceType: data.sourceType || 'text',
+      rawText: data.rawText || '',
+      citation: data.citation || '',
+      court: data.court || '',
+      date: data.date || '',
+      url: data.url,
+      pageCount: data.pageCount,
+      verificationStatus: data.verificationStatus || 'user_provided_needs_verification',
+      sourceOrigin: data.sourceOrigin || 'User Upload',
+      isVerified: !!data.isVerified,
+      createdAt: data.createdAt || Date.now(),
+      updatedAt: data.updatedAt || Date.now(),
+    });
+  });
+  return list;
+}
+
+export async function saveUserSource(userId: string, source: SourceDocument): Promise<void> {
+  if (!userId || !source.id) throw new Error('User ID and Source ID required.');
+  const docRef = doc(db, 'users', userId, 'sources', source.id);
+  const payload = sanitizeFirestorePayload({
+    ...source,
+    userId,
+    updatedAt: Date.now(),
+  });
+  await setDoc(docRef, payload, { merge: true });
+}
+
+export async function deleteUserSource(userId: string, sourceId: string): Promise<void> {
+  if (!userId || !sourceId) throw new Error('User ID and Source ID required.');
+  const docRef = doc(db, 'users', userId, 'sources', sourceId);
+  await deleteDoc(docRef);
+}
+
+/**
+ * Case Analysis: /users/{userId}/analyses/{analysisId}
+ */
+export async function fetchUserAnalyses(userId: string): Promise<CaseAnalysis[]> {
+  if (!userId) throw new Error('User ID is required.');
+  const collRef = collection(db, 'users', userId, 'analyses');
+  const snapshot = await getDocs(collRef);
+  const list: CaseAnalysis[] = [];
+  snapshot.forEach(d => {
+    list.push({ id: d.id, ...d.data() } as CaseAnalysis);
+  });
+  return list;
+}
+
+export async function saveUserAnalysis(userId: string, analysis: CaseAnalysis): Promise<void> {
+  if (!userId || !analysis.id) throw new Error('User ID and Analysis ID required.');
+  const docRef = doc(db, 'users', userId, 'analyses', analysis.id);
+  const payload = sanitizeFirestorePayload({
+    ...analysis,
+    analyzedAt: Date.now(),
+  });
+  await setDoc(docRef, payload, { merge: true });
+}
+
+/**
+ * Saved Findings: /users/{userId}/findings/{findingId}
+ */
+export async function fetchUserFindings(userId: string): Promise<SavedFinding[]> {
+  if (!userId) throw new Error('User ID is required.');
+  const collRef = collection(db, 'users', userId, 'findings');
+  const q = query(collRef, orderBy('savedAt', 'desc'));
+  const snapshot = await getDocs(q);
+  const list: SavedFinding[] = [];
+  snapshot.forEach(d => {
+    const data = d.data();
+    list.push({
+      id: d.id,
+      userId: data.userId || userId,
+      title: data.title || 'Saved Finding',
+      findingText: data.findingText || '',
+      sourceTitle: data.sourceTitle,
+      savedAt: data.savedAt || Date.now(),
+    });
+  });
+  return list;
+}
+
+export async function saveUserFinding(userId: string, finding: SavedFinding): Promise<void> {
+  if (!userId || !finding.id) throw new Error('User ID and Finding ID required.');
+  const docRef = doc(db, 'users', userId, 'findings', finding.id);
+  const payload = sanitizeFirestorePayload({
+    ...finding,
+    userId,
+    savedAt: finding.savedAt || Date.now(),
+  });
+  await setDoc(docRef, payload, { merge: true });
+}
+
+export async function deleteUserFinding(userId: string, findingId: string): Promise<void> {
+  if (!userId || !findingId) throw new Error('User ID and Finding ID required.');
+  const docRef = doc(db, 'users', userId, 'findings', findingId);
+  await deleteDoc(docRef);
+}
+
+/**
+ * Research Digests: /users/{userId}/digests/{digestId}
+ */
+export async function fetchUserDigests(userId: string): Promise<ResearchDigest[]> {
+  if (!userId) return [];
+  const collRef = collection(db, 'users', userId, 'digests');
+  const q = query(collRef, orderBy('generatedAt', 'desc'));
+  try {
+    const snapshot = await getDocs(q);
+    const list: ResearchDigest[] = [];
+    snapshot.forEach(d => {
+      list.push({ id: d.id, ...d.data() } as ResearchDigest);
+    });
+    return list;
+  } catch (e) {
+    console.warn('Digests collection read warning:', e);
+    return [];
+  }
+}
+
+export async function saveUserDigest(userId: string, digest: ResearchDigest): Promise<void> {
+  if (!userId || !digest.id) throw new Error('User ID and Digest ID required.');
+  const docRef = doc(db, 'users', userId, 'digests', digest.id);
+  const payload = sanitizeFirestorePayload({
+    ...digest,
+    userId,
+    generatedAt: Date.now(),
+  });
+  await setDoc(docRef, payload, { merge: true });
+}
+
+/**
+ * User Settings (e.g. Language Preference): /users/{userId}/settings/preferences
+ */
+export async function fetchUserLanguagePreference(userId: string): Promise<SupportedLanguage> {
+  if (!userId) return 'en';
+  try {
+    const docRef = doc(db, 'users', userId, 'settings', 'preferences');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return (snap.data().language as SupportedLanguage) || 'en';
+    }
+  } catch (err) {
+    console.warn('Could not fetch language preference:', err);
+  }
+  return 'en';
+}
+
+export async function saveUserLanguagePreference(userId: string, language: SupportedLanguage): Promise<void> {
+  if (!userId) return;
+  const docRef = doc(db, 'users', userId, 'settings', 'preferences');
+  await setDoc(docRef, sanitizeFirestorePayload({ language, updatedAt: Date.now() }), { merge: true });
 }

@@ -1,0 +1,187 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique user ID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "photoURL": { "type": "string", "description": "User profile picture URL" },
+        "isAnonymous": { "type": "boolean", "description": "Whether the user is anonymous" }
+      },
+      "required": ["uid"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "Legal reflections and user journal entries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Entry document identifier" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "title": { "type": "string", "description": "Title of reflection", "maxLength": 200 },
+        "content": { "type": "string", "description": "Body text of entry", "maxLength": 20000 },
+        "mood": { "type": "string", "description": "Reflection mood tag" },
+        "tags": { "type": "array", "description": "Category tags" },
+        "summary": { "type": "string", "description": "AI summary" },
+        "keyInsights": { "type": "array", "description": "Key takeaways" },
+        "interactions": { "type": "array", "description": "Chat turns" },
+        "createdAt": { "type": "number", "description": "Creation timestamp" },
+        "updatedAt": { "type": "number", "description": "Last update timestamp" }
+      },
+      "required": ["id", "userId", "title", "content", "createdAt", "updatedAt"]
+    },
+    "ResearchSession": {
+      "title": "ResearchSession",
+      "description": "Structured legal research workspace session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique session ID", "maxLength": 128 },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "title": { "type": "string", "description": "Session topic or proposition title", "maxLength": 300 },
+        "researchQuestion": { "type": "string", "description": "Primary legal proposition or inquiry", "maxLength": 5000 },
+        "legalTopic": { "type": "string", "description": "Domain of law", "maxLength": 100 },
+        "notes": { "type": "string", "description": "Advocate's notes", "maxLength": 10000 },
+        "sourceDocumentIds": { "type": "array", "description": "List of attached source document IDs" },
+        "messages": { "type": "array", "description": "Session chat messages" },
+        "caseTraceIds": { "type": "array", "description": "Case citation trace references" },
+        "createdAt": { "type": "number", "description": "Creation timestamp" },
+        "updatedAt": { "type": "number", "description": "Last update timestamp" }
+      },
+      "required": ["id", "userId", "title", "createdAt", "updatedAt"]
+    },
+    "SourceDocument": {
+      "title": "SourceDocument",
+      "description": "User uploaded or verified legal authority",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Source ID", "maxLength": 128 },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "sessionId": { "type": "string", "description": "Associated session ID" },
+        "title": { "type": "string", "description": "Document title", "maxLength": 500 },
+        "sourceType": { "type": "string", "description": "Type of source e.g. judgment, statute, pdf" },
+        "rawText": { "type": "string", "description": "Textual content of the legal document", "maxLength": 500000 },
+        "citation": { "type": "string", "description": "Official reporter citation", "maxLength": 200 },
+        "court": { "type": "string", "description": "Originating court or bench", "maxLength": 200 },
+        "date": { "type": "string", "description": "Date of judgment", "maxLength": 50 },
+        "url": { "type": "string", "description": "Source URL if available" },
+        "pageCount": { "type": "number", "description": "Page count" },
+        "verificationStatus": { "type": "string", "description": "Verification state" },
+        "sourceOrigin": { "type": "string", "description": "Provenance origin" },
+        "isVerified": { "type": "boolean", "description": "Whether authority is verified" },
+        "createdAt": { "type": "number", "description": "Creation timestamp" },
+        "updatedAt": { "type": "number", "description": "Last update timestamp" }
+      },
+      "required": ["id", "userId", "title", "rawText", "createdAt", "updatedAt"]
+    },
+    "CaseAnalysis": {
+      "title": "CaseAnalysis",
+      "description": "Deep ratio decidendi and precedent analysis breakdown",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Analysis ID", "maxLength": 128 },
+        "sourceDocumentId": { "type": "string", "description": "Associated source document ID" },
+        "caseName": { "type": "string", "description": "Name of the case", "maxLength": 300 },
+        "court": { "type": "string", "description": "Bench name", "maxLength": 200 },
+        "date": { "type": "string", "description": "Date", "maxLength": 50 },
+        "citation": { "type": "string", "description": "Reporter citation", "maxLength": 200 },
+        "facts": { "type": "string", "description": "Extracted material facts", "maxLength": 50000 },
+        "legalIssues": { "type": "array", "description": "Legal issues formulated" },
+        "decision": { "type": "string", "description": "Dispositive ruling", "maxLength": 20000 },
+        "reasoning": { "type": "string", "description": "Judicial rationale", "maxLength": 50000 },
+        "ratioDecidendi": { "type": "string", "description": "Binding rule of law", "maxLength": 20000 },
+        "importantObservations": { "type": "array", "description": "Notable obiter or remarks" },
+        "statutesMentioned": { "type": "array", "description": "Relevant statutes" },
+        "casesCited": { "type": "array", "description": "Precedents cited" },
+        "caseRelationships": { "type": "array", "description": "Citation network relationships" },
+        "verificationNotes": { "type": "string", "description": "Notes regarding source verification" },
+        "analyzedAt": { "type": "number", "description": "Analysis timestamp" }
+      },
+      "required": ["id", "sourceDocumentId", "caseName", "analyzedAt"]
+    },
+    "SavedFinding": {
+      "title": "SavedFinding",
+      "description": "Saved legal proposition, excerpt, or ruling in Vault",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Finding ID", "maxLength": 128 },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "sessionId": { "type": "string", "description": "Associated session ID" },
+        "sessionTitle": { "type": "string", "description": "Associated session title" },
+        "title": { "type": "string", "description": "Finding title", "maxLength": 300 },
+        "findingText": { "type": "string", "description": "Verbatim quote or proposition text", "maxLength": 20000 },
+        "sourceDocumentId": { "type": "string", "description": "Source ID" },
+        "sourceTitle": { "type": "string", "description": "Source title", "maxLength": 300 },
+        "sourceLocation": { "type": "string", "description": "Paragraph or page reference", "maxLength": 100 },
+        "isVerifiedFromSource": { "type": "boolean", "description": "Source grounding flag" },
+        "legalTopic": { "type": "string", "description": "Legal topic" },
+        "tags": { "type": "array", "description": "Tags" },
+        "savedAt": { "type": "number", "description": "Save timestamp" }
+      },
+      "required": ["id", "userId", "title", "findingText", "savedAt"]
+    },
+    "ResearchDigest": {
+      "title": "ResearchDigest",
+      "description": "Periodic synthesized research digest",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Digest ID", "maxLength": 128 },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "generatedAt": { "type": "number", "description": "Generation timestamp" },
+        "periodLabel": { "type": "string", "description": "Label for period e.g. Weekly Digest" },
+        "frequentlyResearchedTopics": { "type": "array", "description": "Topics researched" },
+        "recurringLegalIssues": { "type": "array", "description": "Frequent issues" },
+        "keyFindingsSummary": { "type": "string", "description": "Executive summary", "maxLength": 20000 },
+        "reviewedDocumentsCount": { "type": "number", "description": "Count of reviewed docs" },
+        "unresolvedQuestions": { "type": "array", "description": "Open legal questions" },
+        "suggestedAvenuesForInvestigation": { "type": "array", "description": "Recommended next steps" }
+      },
+      "required": ["id", "userId", "generatedAt", "periodLabel", "keyFindingsSummary"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User preference settings such as language selection",
+      "type": "object",
+      "properties": {
+        "language": { "type": "string", "description": "Language code preference e.g. en, hi" },
+        "updatedAt": { "type": "number", "description": "Update timestamp" }
+      },
+      "required": ["language"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "UserProfile" },
+      "description": "User profile root document"
+    },
+    "/users/{userId}/entries/{entryId}": {
+      "schema": { "$ref": "JournalEntry" },
+      "description": "User personal legal reflections and journal entries"
+    },
+    "/users/{userId}/researchSessions/{sessionId}": {
+      "schema": { "$ref": "ResearchSession" },
+      "description": "User legal research workspace sessions"
+    },
+    "/users/{userId}/sources/{sourceId}": {
+      "schema": { "$ref": "SourceDocument" },
+      "description": "User source document library repository"
+    },
+    "/users/{userId}/analyses/{analysisId}": {
+      "schema": { "$ref": "CaseAnalysis" },
+      "description": "Extracted case law analyses and ratio breakdowns"
+    },
+    "/users/{userId}/findings/{findingId}": {
+      "schema": { "$ref": "SavedFinding" },
+      "description": "Advocate vault saved propositions and citations"
+    },
+    "/users/{userId}/digests/{digestId}": {
+      "schema": { "$ref": "ResearchDigest" },
+      "description": "Periodic research intelligence digests"
+    },
+    "/users/{userId}/settings/{settingId}": {
+      "schema": { "$ref": "UserSettings" },
+      "description": "User preferences and system configuration"
+    }
+  }
+}
