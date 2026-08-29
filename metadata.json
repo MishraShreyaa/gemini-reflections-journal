@@ -1,0 +1,8 @@
+{
+  "name": "Gemini Reflections & Journal",
+  "description": "A secure, user-authenticated reflection journal powered by Gemini 3.6 Flash and Cloud Firestore with real-time AI summaries, brainstorming, and user-isolated history.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
