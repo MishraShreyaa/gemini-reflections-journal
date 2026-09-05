@@ -1,5 +1,108 @@
 export type AIInteractionMode = 'reflection' | 'summary' | 'brainstorm' | 'coaching';
 
+// ==========================================
+// NYAYATRACE RBAC & ROLE DEFINITIONS
+// ==========================================
+
+export type UserRole = 'USER' | 'LAWYER' | 'ADMIN';
+
+export type LawyerVerificationStatus = 
+  | 'NONE'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'SUSPENDED';
+
+export type LegalSourceStatus = 
+  | 'UNDER_REVIEW'
+  | 'ADMIN_APPROVED'
+  | 'REJECTED'
+  | 'ARCHIVED';
+
+export interface UserRoleRecord {
+  uid: string;
+  email: string | null;
+  role: UserRole;
+  lawyerStatus: LawyerVerificationStatus;
+  barEnrollmentNumber?: string;
+  stateBarCouncil?: string;
+  assignedAt: number;
+  assignedBy: string;
+  isSuspended?: boolean;
+}
+
+export interface LawyerApplication {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  barEnrollmentNumber: string;
+  stateBarCouncil: string;
+  practiceAreas?: string[];
+  experienceYears?: number;
+  verificationStatus: LawyerVerificationStatus;
+  adminNotes?: string;
+  submittedAt: number;
+  reviewedAt?: number;
+  reviewedBy?: string;
+}
+
+export interface SharedLegalSource {
+  id: string;
+  title: string;
+  citation: string;
+  court: string;
+  date: string;
+  status: LegalSourceStatus;
+  sourceType: SourceType;
+  rawText: string;
+  uploadedBy: string;
+  uploadedAt: number;
+  reviewedBy?: string;
+  reviewedAt?: number;
+  adminReviewNotes?: string;
+  isVerified: boolean;
+  statutesReferenced?: string[];
+  keyTopics?: string[];
+  pageCount?: number;
+  url?: string;
+}
+
+export type AuditAction = 
+  | 'ADMIN_LOGIN'
+  | 'LAWYER_APPLIED'
+  | 'LAWYER_APPROVED'
+  | 'LAWYER_REJECTED'
+  | 'LAWYER_SUSPENDED'
+  | 'SOURCE_UPLOADED'
+  | 'SOURCE_APPROVED'
+  | 'SOURCE_REJECTED'
+  | 'SOURCE_ARCHIVED'
+  | 'SOURCE_DELETED'
+  | 'ROLE_CHANGED'
+  | 'UNAUTHORIZED_ACCESS_ATTEMPT';
+
+export interface AuditLogEntry {
+  id: string;
+  action: AuditAction;
+  performedByUid: string;
+  performedByEmail?: string;
+  targetEntityId?: string;
+  targetEntityType?: 'user' | 'lawyer_application' | 'source' | 'system';
+  details?: string;
+  ipAddress?: string;
+  timestamp: number;
+}
+
+export interface AuthSessionState {
+  user: UserProfile | null;
+  role: UserRole;
+  lawyerStatus: LawyerVerificationStatus;
+  isSuspended: boolean;
+  lawyerApplication?: LawyerApplication | null;
+  token?: string | null;
+}
+
 export interface InteractionMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -79,6 +182,7 @@ export type VerificationStatus =
   | 'source_unavailable';
 
 export type ResearchSearchMode = 
+  | 'free_text'
   | 'plain_language'
   | 'facts_similarity'
   | 'case_name_citation' 
@@ -122,13 +226,17 @@ export interface FactSearchResult {
   factualSimilarityScore: number; // 0 - 100
   legalIssueMatchScore: number; // 0 - 100
   authorityRelevanceScore: number; // 0 - 100
-  overallRelevanceScore: number; // 0 - 100
+  sourceQualityScore?: number; // 0 - 100 (Default: 100 for verified official sources)
+  overallRelevanceScore: number; // 0 - 100: Math.round(0.40 * legal + 0.30 * authority + 0.20 * factual + 0.10 * quality)
   factualSimilarityExplanation: string;
   legalIssueSimilarity: string;
   relevanceJustification: string;
   plainLanguageSummary?: string;
   relevantPassage: string; // Exact verbatim quote from source
   passageLocation?: string; // e.g. "Paragraph 18" or "Page 24"
+  isVerbatim?: boolean; // True if exact match with authenticated source text
+  alternateCitations?: string[]; // Merged citations from deduplicated records
+  benchStrength?: string; // e.g. "13-Judge Constitution Bench"
   comparisonDetails: {
     userFacts: string[];
     judgmentFacts: string[];
@@ -175,6 +283,8 @@ export interface SourceDocument {
   judgmentDate?: string;
   url?: string;
   pageCount?: number;
+  statutesReferenced?: string[];
+  uploadedAt?: number;
   verificationStatus: VerificationStatus;
   sourceOrigin?: string;
   isVerified?: boolean;

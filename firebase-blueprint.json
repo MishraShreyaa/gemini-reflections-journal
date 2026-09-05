@@ -13,175 +13,162 @@
       },
       "required": ["uid"]
     },
-    "JournalEntry": {
-      "title": "JournalEntry",
-      "description": "Legal reflections and user journal entries",
+    "UserRoleRecord": {
+      "title": "UserRoleRecord",
+      "description": "Server-controlled user role and lawyer authorization status",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Entry document identifier" },
-        "userId": { "type": "string", "description": "Owner user UID" },
-        "title": { "type": "string", "description": "Title of reflection", "maxLength": 200 },
-        "content": { "type": "string", "description": "Body text of entry", "maxLength": 20000 },
-        "mood": { "type": "string", "description": "Reflection mood tag" },
-        "tags": { "type": "array", "description": "Category tags" },
-        "summary": { "type": "string", "description": "AI summary" },
-        "keyInsights": { "type": "array", "description": "Key takeaways" },
-        "interactions": { "type": "array", "description": "Chat turns" },
-        "createdAt": { "type": "number", "description": "Creation timestamp" },
-        "updatedAt": { "type": "number", "description": "Last update timestamp" }
+        "uid": { "type": "string", "description": "User UID" },
+        "email": { "type": "string", "description": "User email" },
+        "role": { "type": "string", "enum": ["USER", "LAWYER", "ADMIN"], "description": "Assigned role" },
+        "lawyerStatus": { "type": "string", "enum": ["NONE", "PENDING", "APPROVED", "REJECTED", "SUSPENDED"], "description": "Lawyer verification status" },
+        "barEnrollmentNumber": { "type": "string", "description": "Bar council enrollment ID" },
+        "stateBarCouncil": { "type": "string", "description": "State bar council name" },
+        "assignedAt": { "type": "number", "description": "Timestamp of role assignment" },
+        "assignedBy": { "type": "string", "description": "Admin UID or system" },
+        "isSuspended": { "type": "boolean", "description": "Whether user is suspended" }
       },
-      "required": ["id", "userId", "title", "content", "createdAt", "updatedAt"]
+      "required": ["uid", "role", "lawyerStatus", "assignedAt"]
+    },
+    "LawyerApplication": {
+      "title": "LawyerApplication",
+      "description": "Application submitted by an advocate for verification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Application ID" },
+        "userId": { "type": "string", "description": "Applicant UID" },
+        "fullName": { "type": "string", "description": "Advocate full name" },
+        "email": { "type": "string", "description": "Advocate email" },
+        "barEnrollmentNumber": { "type": "string", "description": "Bar Council enrollment ID" },
+        "stateBarCouncil": { "type": "string", "description": "State Bar Council" },
+        "experienceYears": { "type": "number", "description": "Years of legal practice" },
+        "practiceAreas": { "type": "array", "description": "Specializations" },
+        "verificationStatus": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED", "SUSPENDED"], "description": "Verification state" },
+        "adminNotes": { "type": "string", "description": "Notes from reviewing administrator" },
+        "submittedAt": { "type": "number", "description": "Submission timestamp" },
+        "reviewedAt": { "type": "number", "description": "Review timestamp" },
+        "reviewedBy": { "type": "string", "description": "Reviewing Admin UID" }
+      },
+      "required": ["id", "userId", "fullName", "email", "barEnrollmentNumber", "stateBarCouncil", "verificationStatus", "submittedAt"]
+    },
+    "SharedLegalSource": {
+      "title": "SharedLegalSource",
+      "description": "Authoritative judgment or statute in the global library",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Source ID" },
+        "title": { "type": "string", "description": "Case name or statutory title" },
+        "citation": { "type": "string", "description": "Official law reporter citation" },
+        "court": { "type": "string", "description": "Adjudicating bench/court" },
+        "date": { "type": "string", "description": "Judgment date" },
+        "status": { "type": "string", "enum": ["UNDER_REVIEW", "ADMIN_APPROVED", "REJECTED", "ARCHIVED"], "description": "Library approval state" },
+        "sourceType": { "type": "string", "description": "Type of legal document" },
+        "rawText": { "type": "string", "description": "Full verbatim text of authority" },
+        "uploadedBy": { "type": "string", "description": "Uploader Admin UID" },
+        "uploadedAt": { "type": "number", "description": "Upload timestamp" },
+        "reviewedBy": { "type": "string", "description": "Reviewing Admin UID" },
+        "reviewedAt": { "type": "number", "description": "Review timestamp" },
+        "adminReviewNotes": { "type": "string", "description": "Editorial verification notes" },
+        "isVerified": { "type": "boolean", "description": "Grounding verification flag" },
+        "statutesReferenced": { "type": "array", "description": "Statutes cited in judgment" },
+        "keyTopics": { "type": "array", "description": "Legal topic tags" }
+      },
+      "required": ["id", "title", "citation", "court", "status", "rawText", "uploadedAt"]
+    },
+    "AuditLogEntry": {
+      "title": "AuditLogEntry",
+      "description": "Immutable security and administrative audit event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Log entry ID" },
+        "action": { "type": "string", "description": "Action performed" },
+        "performedByUid": { "type": "string", "description": "User UID who triggered action" },
+        "performedByEmail": { "type": "string", "description": "Email of user" },
+        "targetEntityId": { "type": "string", "description": "ID of affected entity" },
+        "targetEntityType": { "type": "string", "description": "Type of affected entity" },
+        "details": { "type": "string", "description": "Contextual description" },
+        "ipAddress": { "type": "string", "description": "Request IP address" },
+        "timestamp": { "type": "number", "description": "Event timestamp" }
+      },
+      "required": ["id", "action", "performedByUid", "timestamp"]
     },
     "ResearchSession": {
       "title": "ResearchSession",
-      "description": "Structured legal research workspace session",
+      "description": "User private legal research workspace session",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique session ID", "maxLength": 128 },
-        "userId": { "type": "string", "description": "Owner user UID" },
-        "title": { "type": "string", "description": "Session topic or proposition title", "maxLength": 300 },
-        "researchQuestion": { "type": "string", "description": "Primary legal proposition or inquiry", "maxLength": 5000 },
-        "legalTopic": { "type": "string", "description": "Domain of law", "maxLength": 100 },
-        "notes": { "type": "string", "description": "Advocate's notes", "maxLength": 10000 },
-        "sourceDocumentIds": { "type": "array", "description": "List of attached source document IDs" },
-        "messages": { "type": "array", "description": "Session chat messages" },
-        "caseTraceIds": { "type": "array", "description": "Case citation trace references" },
+        "id": { "type": "string", "description": "Session ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "title": { "type": "string", "description": "Session title" },
+        "researchQuestion": { "type": "string", "description": "Primary proposition" },
+        "legalTopic": { "type": "string", "description": "Domain of law" },
+        "notes": { "type": "string", "description": "Notes" },
+        "sourceDocumentIds": { "type": "array", "description": "Attached source IDs" },
+        "messages": { "type": "array", "description": "Messages" },
         "createdAt": { "type": "number", "description": "Creation timestamp" },
         "updatedAt": { "type": "number", "description": "Last update timestamp" }
       },
       "required": ["id", "userId", "title", "createdAt", "updatedAt"]
     },
-    "SourceDocument": {
-      "title": "SourceDocument",
-      "description": "User uploaded or verified legal authority",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "Source ID", "maxLength": 128 },
-        "userId": { "type": "string", "description": "Owner user UID" },
-        "sessionId": { "type": "string", "description": "Associated session ID" },
-        "title": { "type": "string", "description": "Document title", "maxLength": 500 },
-        "sourceType": { "type": "string", "description": "Type of source e.g. judgment, statute, pdf" },
-        "rawText": { "type": "string", "description": "Textual content of the legal document", "maxLength": 500000 },
-        "citation": { "type": "string", "description": "Official reporter citation", "maxLength": 200 },
-        "court": { "type": "string", "description": "Originating court or bench", "maxLength": 200 },
-        "date": { "type": "string", "description": "Date of judgment", "maxLength": 50 },
-        "url": { "type": "string", "description": "Source URL if available" },
-        "pageCount": { "type": "number", "description": "Page count" },
-        "verificationStatus": { "type": "string", "description": "Verification state" },
-        "sourceOrigin": { "type": "string", "description": "Provenance origin" },
-        "isVerified": { "type": "boolean", "description": "Whether authority is verified" },
-        "createdAt": { "type": "number", "description": "Creation timestamp" },
-        "updatedAt": { "type": "number", "description": "Last update timestamp" }
-      },
-      "required": ["id", "userId", "title", "rawText", "createdAt", "updatedAt"]
-    },
-    "CaseAnalysis": {
-      "title": "CaseAnalysis",
-      "description": "Deep ratio decidendi and precedent analysis breakdown",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "Analysis ID", "maxLength": 128 },
-        "sourceDocumentId": { "type": "string", "description": "Associated source document ID" },
-        "caseName": { "type": "string", "description": "Name of the case", "maxLength": 300 },
-        "court": { "type": "string", "description": "Bench name", "maxLength": 200 },
-        "date": { "type": "string", "description": "Date", "maxLength": 50 },
-        "citation": { "type": "string", "description": "Reporter citation", "maxLength": 200 },
-        "facts": { "type": "string", "description": "Extracted material facts", "maxLength": 50000 },
-        "legalIssues": { "type": "array", "description": "Legal issues formulated" },
-        "decision": { "type": "string", "description": "Dispositive ruling", "maxLength": 20000 },
-        "reasoning": { "type": "string", "description": "Judicial rationale", "maxLength": 50000 },
-        "ratioDecidendi": { "type": "string", "description": "Binding rule of law", "maxLength": 20000 },
-        "importantObservations": { "type": "array", "description": "Notable obiter or remarks" },
-        "statutesMentioned": { "type": "array", "description": "Relevant statutes" },
-        "casesCited": { "type": "array", "description": "Precedents cited" },
-        "caseRelationships": { "type": "array", "description": "Citation network relationships" },
-        "verificationNotes": { "type": "string", "description": "Notes regarding source verification" },
-        "analyzedAt": { "type": "number", "description": "Analysis timestamp" }
-      },
-      "required": ["id", "sourceDocumentId", "caseName", "analyzedAt"]
-    },
     "SavedFinding": {
       "title": "SavedFinding",
-      "description": "Saved legal proposition, excerpt, or ruling in Vault",
+      "description": "Private user saved proposition or quotation",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Finding ID", "maxLength": 128 },
-        "userId": { "type": "string", "description": "Owner user UID" },
-        "sessionId": { "type": "string", "description": "Associated session ID" },
-        "sessionTitle": { "type": "string", "description": "Associated session title" },
-        "title": { "type": "string", "description": "Finding title", "maxLength": 300 },
-        "findingText": { "type": "string", "description": "Verbatim quote or proposition text", "maxLength": 20000 },
-        "sourceDocumentId": { "type": "string", "description": "Source ID" },
-        "sourceTitle": { "type": "string", "description": "Source title", "maxLength": 300 },
-        "sourceLocation": { "type": "string", "description": "Paragraph or page reference", "maxLength": 100 },
-        "isVerifiedFromSource": { "type": "boolean", "description": "Source grounding flag" },
-        "legalTopic": { "type": "string", "description": "Legal topic" },
-        "tags": { "type": "array", "description": "Tags" },
-        "savedAt": { "type": "number", "description": "Save timestamp" }
+        "id": { "type": "string", "description": "Finding ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "title": { "type": "string", "description": "Finding title" },
+        "findingText": { "type": "string", "description": "Text" },
+        "savedAt": { "type": "number", "description": "Timestamp" }
       },
       "required": ["id", "userId", "title", "findingText", "savedAt"]
     },
     "ResearchDigest": {
       "title": "ResearchDigest",
-      "description": "Periodic synthesized research digest",
+      "description": "Private executive research digest",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Digest ID", "maxLength": 128 },
-        "userId": { "type": "string", "description": "Owner user UID" },
-        "generatedAt": { "type": "number", "description": "Generation timestamp" },
-        "periodLabel": { "type": "string", "description": "Label for period e.g. Weekly Digest" },
-        "frequentlyResearchedTopics": { "type": "array", "description": "Topics researched" },
-        "recurringLegalIssues": { "type": "array", "description": "Frequent issues" },
-        "keyFindingsSummary": { "type": "string", "description": "Executive summary", "maxLength": 20000 },
-        "reviewedDocumentsCount": { "type": "number", "description": "Count of reviewed docs" },
-        "unresolvedQuestions": { "type": "array", "description": "Open legal questions" },
-        "suggestedAvenuesForInvestigation": { "type": "array", "description": "Recommended next steps" }
+        "id": { "type": "string", "description": "Digest ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "generatedAt": { "type": "number", "description": "Timestamp" },
+        "periodLabel": { "type": "string", "description": "Period" },
+        "keyFindingsSummary": { "type": "string", "description": "Summary" }
       },
       "required": ["id", "userId", "generatedAt", "periodLabel", "keyFindingsSummary"]
-    },
-    "UserSettings": {
-      "title": "UserSettings",
-      "description": "User preference settings such as language selection",
-      "type": "object",
-      "properties": {
-        "language": { "type": "string", "description": "Language code preference e.g. en, hi" },
-        "updatedAt": { "type": "number", "description": "Update timestamp" }
-      },
-      "required": ["language"]
     }
   },
   "firestore": {
+    "/userRoles/{uid}": {
+      "schema": { "$ref": "UserRoleRecord" },
+      "description": "Server-controlled user authorization and role records"
+    },
+    "/lawyerApplications/{applicationId}": {
+      "schema": { "$ref": "LawyerApplication" },
+      "description": "Advocate verification requests and review statuses"
+    },
+    "/legalSources/{sourceId}": {
+      "schema": { "$ref": "SharedLegalSource" },
+      "description": "Global authoritative legal source repository"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "AuditLogEntry" },
+      "description": "Privileged activity and administrative audit logs"
+    },
     "/users/{userId}": {
       "schema": { "$ref": "UserProfile" },
-      "description": "User profile root document"
-    },
-    "/users/{userId}/entries/{entryId}": {
-      "schema": { "$ref": "JournalEntry" },
-      "description": "User personal legal reflections and journal entries"
+      "description": "User profile document"
     },
     "/users/{userId}/researchSessions/{sessionId}": {
       "schema": { "$ref": "ResearchSession" },
-      "description": "User legal research workspace sessions"
-    },
-    "/users/{userId}/sources/{sourceId}": {
-      "schema": { "$ref": "SourceDocument" },
-      "description": "User source document library repository"
-    },
-    "/users/{userId}/analyses/{analysisId}": {
-      "schema": { "$ref": "CaseAnalysis" },
-      "description": "Extracted case law analyses and ratio breakdowns"
+      "description": "User private research sessions"
     },
     "/users/{userId}/findings/{findingId}": {
       "schema": { "$ref": "SavedFinding" },
-      "description": "Advocate vault saved propositions and citations"
+      "description": "User private findings"
     },
     "/users/{userId}/digests/{digestId}": {
       "schema": { "$ref": "ResearchDigest" },
-      "description": "Periodic research intelligence digests"
-    },
-    "/users/{userId}/settings/{settingId}": {
-      "schema": { "$ref": "UserSettings" },
-      "description": "User preferences and system configuration"
+      "description": "User private digests"
     }
   }
 }

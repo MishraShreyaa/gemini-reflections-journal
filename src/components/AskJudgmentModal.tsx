@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authFetch } from '../lib/api';
 import { 
   X, 
   MessageSquare, 
@@ -55,20 +56,22 @@ export const AskJudgmentModal: React.FC<AskJudgmentModalProps> = ({
     setError(null);
 
     try {
-      const res = await fetch('/api/nyaya/ask-judgment', {
+      const res = await authFetch('/api/nyaya/ask-judgment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: q.trim(),
           documentTitle: source.title,
+          caseName: source.title,
           sourceText: source.rawText,
+          judgmentText: source.rawText,
           language,
           userContext: userContext || '',
         }),
       });
 
       if (!res.ok) {
-        throw new Error('Failed to query judgment.');
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || 'Failed to query judgment.');
       }
 
       const data = await res.json();

@@ -11,17 +11,23 @@ import {
   Bookmark, 
   BookMarked,
   Sparkles,
-  User as UserIcon
+  User as UserIcon,
+  ShieldAlert,
+  Briefcase,
+  Crown
 } from 'lucide-react';
-import type { UserProfile, SupportedLanguage } from '../types';
+import type { UserProfile, SupportedLanguage, UserRole, LawyerVerificationStatus } from '../types';
 import { SUPPORTED_LANGUAGES, getTranslation } from '../lib/i18n';
 
 interface NavbarProps {
   user: UserProfile | null;
+  userRole?: UserRole;
+  lawyerStatus?: LawyerVerificationStatus;
   onLogout: () => void;
   onOpenSecurityModal: () => void;
-  activeView: 'library' | 'trace' | 'analysis' | 'comparison' | 'canvas' | 'findings' | 'journal';
-  onSelectView: (view: 'library' | 'trace' | 'analysis' | 'comparison' | 'canvas' | 'findings' | 'journal') => void;
+  onOpenLawyerModal?: () => void;
+  activeView: 'library' | 'trace' | 'analysis' | 'comparison' | 'canvas' | 'findings' | 'journal' | 'admin' | 'lawyer-workspace';
+  onSelectView: (view: 'library' | 'trace' | 'analysis' | 'comparison' | 'canvas' | 'findings' | 'journal' | 'admin' | 'lawyer-workspace') => void;
   language: SupportedLanguage;
   onSelectLanguage: (lang: SupportedLanguage) => void;
   sourcesCount: number;
@@ -29,8 +35,11 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   user,
+  userRole = 'USER',
+  lawyerStatus = 'NONE',
   onLogout,
   onOpenSecurityModal,
+  onOpenLawyerModal,
   activeView,
   onSelectView,
   language,
@@ -66,6 +75,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Navigation Tabs for Legal Workspace */}
         {user && (
           <nav className="hidden lg:flex items-center space-x-1 bg-stone-800/80 p-1 rounded-xl border border-stone-700/60">
+            
+            {/* Lawyer Chamber Tab */}
+            {(userRole === 'LAWYER' || userRole === 'ADMIN') && (
+              <button
+                type="button"
+                onClick={() => onSelectView('lawyer-workspace')}
+                className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeView === 'lawyer-workspace' ? 'bg-blue-600 text-white shadow-xs' : 'text-blue-300 hover:text-white hover:bg-stone-700/50'
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5" />
+                <span>Lawyer Chamber</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onSelectView('library')}
@@ -148,12 +172,48 @@ export const Navbar: React.FC<NavbarProps> = ({
               <BookMarked className="w-3.5 h-3.5" />
               <span>Journal</span>
             </button>
+
+            {/* Admin Portal Tab (Only for Admin Role) */}
+            {userRole === 'ADMIN' && (
+              <button
+                type="button"
+                onClick={() => onSelectView('admin')}
+                className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeView === 'admin' ? 'bg-rose-600 text-white shadow-xs' : 'text-rose-300 hover:text-white hover:bg-rose-950/50'
+                }`}
+                title="Master Administrator & Security Dashboard"
+              >
+                <Crown className="w-3.5 h-3.5 text-rose-300" />
+                <span>Admin Portal</span>
+              </button>
+            )}
+
           </nav>
         )}
 
-        {/* Right Section: Language Switcher, Security Modal, User Controls */}
+        {/* Right Section: Language Switcher, Lawyer Application, Role Badge, User Controls */}
         <div className="flex items-center space-x-2 sm:space-x-3">
           
+          {/* Lawyer Verification Button / Status for Standard Users */}
+          {user && userRole === 'USER' && (
+            <>
+              {lawyerStatus === 'PENDING' ? (
+                <div className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-amber-300 bg-amber-950/60 border border-amber-700/60 font-mono">
+                  <span>Advocate Verification: Pending</span>
+                </div>
+              ) : (
+                <button
+                  onClick={onOpenLawyerModal}
+                  className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-300 bg-blue-950/60 border border-blue-700/60 hover:bg-blue-900/60 transition-colors cursor-pointer"
+                  title="Verify Bar Council Enrollment"
+                >
+                  <Briefcase className="w-3.5 h-3.5" />
+                  <span>Advocate Verification</span>
+                </button>
+              )}
+            </>
+          )}
+
           {/* Indian 10-Language Switcher */}
           <div className="relative flex items-center">
             <Globe className="w-3.5 h-3.5 absolute left-2.5 text-stone-400 pointer-events-none" />
@@ -185,7 +245,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {user && (
             <>
-              {/* User Profile Pill */}
+              {/* User Profile Pill & Role Badge */}
               <div 
                 id="user-profile-badge" 
                 className="flex items-center space-x-2 px-2.5 py-1 rounded-lg bg-stone-800 border border-stone-700 text-xs text-stone-200"
@@ -205,11 +265,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="font-medium max-w-[100px] truncate hidden sm:inline">
                   {user.displayName}
                 </span>
-                {user.isAnonymous && (
-                  <span className="text-[9px] px-1 py-0.2 bg-stone-700 text-amber-300 rounded font-mono">
-                    Guest
-                  </span>
-                )}
+
+                {/* Dynamic Role Tag */}
+                <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold uppercase ${
+                  userRole === 'ADMIN'
+                    ? 'bg-rose-500/30 text-rose-300 border border-rose-500/40'
+                    : userRole === 'LAWYER'
+                    ? 'bg-blue-500/30 text-blue-300 border border-blue-500/40'
+                    : 'bg-stone-700 text-stone-300'
+                }`}>
+                  {userRole}
+                </span>
               </div>
 
               {/* Sign Out Button */}
@@ -233,6 +299,26 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Sub-Navigation Bar */}
       {user && (
         <div className="lg:hidden border-t border-stone-800 bg-stone-950 px-3 py-2 flex items-center overflow-x-auto gap-2 text-xs">
+          {(userRole === 'LAWYER' || userRole === 'ADMIN') && (
+            <button
+              onClick={() => onSelectView('lawyer-workspace')}
+              className={`px-2.5 py-1 rounded-md shrink-0 font-medium ${
+                activeView === 'lawyer-workspace' ? 'bg-blue-600 text-white' : 'text-blue-300'
+              }`}
+            >
+              Lawyer Chamber
+            </button>
+          )}
+          {userRole === 'ADMIN' && (
+            <button
+              onClick={() => onSelectView('admin')}
+              className={`px-2.5 py-1 rounded-md shrink-0 font-medium ${
+                activeView === 'admin' ? 'bg-rose-600 text-white' : 'text-rose-300'
+              }`}
+            >
+              Admin Portal
+            </button>
+          )}
           <button
             onClick={() => onSelectView('library')}
             className={`px-2.5 py-1 rounded-md shrink-0 font-medium ${
@@ -294,3 +380,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+

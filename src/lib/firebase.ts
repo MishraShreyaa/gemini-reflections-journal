@@ -400,3 +400,178 @@ export async function saveUserLanguagePreference(userId: string, language: Suppo
   const docRef = doc(db, 'users', userId, 'settings', 'preferences');
   await setDoc(docRef, sanitizeFirestorePayload({ language, updatedAt: Date.now() }), { merge: true });
 }
+
+// ==========================================
+// SERVER-AUTHORITATIVE RBAC & API CLIENT HELPERS
+// ==========================================
+
+export async function getAuthToken(): Promise<string | null> {
+  const user = auth.currentUser;
+  if (!user) return null;
+  try {
+    return await user.getIdToken();
+  } catch (err) {
+    console.warn('Could not get Firebase ID token:', err);
+    return null;
+  }
+}
+
+export async function fetchServerUserProfile(): Promise<{
+  uid: string;
+  email: string | null;
+  role: 'USER' | 'LAWYER' | 'ADMIN';
+  lawyerStatus: 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+  barEnrollmentNumber?: string;
+  stateBarCouncil?: string;
+  isSuspended: boolean;
+  lawyerApplication?: any;
+}> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/auth/me', { headers });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch server profile (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function applyForLawyerVerification(data: {
+  fullName: string;
+  email?: string;
+  barEnrollmentNumber: string;
+  stateBarCouncil: string;
+  practiceAreas?: string[];
+  experienceYears?: number;
+}): Promise<any> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/lawyer/apply', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error || 'Failed to submit lawyer verification application.');
+  }
+  return res.json();
+}
+
+export async function fetchApprovedGlobalSources(): Promise<any[]> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/sources/approved', { headers });
+  if (!res.ok) {
+    throw new Error('Failed to fetch approved legal sources.');
+  }
+  const data = await res.json();
+  return data.sources || [];
+}
+
+export async function fetchAdminUsers(): Promise<any[]> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/admin/users', { headers });
+  if (!res.ok) throw new Error('Unauthorized: Admin role required.');
+  const data = await res.json();
+  return data.users || [];
+}
+
+export async function updateAdminUserRole(uid: string, role?: string, isSuspended?: boolean): Promise<any> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/admin/users/${uid}/role`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ role, isSuspended }),
+  });
+  if (!res.ok) throw new Error('Failed to update user role.');
+  return res.json();
+}
+
+export async function fetchAdminLawyerApplications(): Promise<any[]> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/admin/lawyer-applications', { headers });
+  if (!res.ok) throw new Error('Unauthorized: Admin role required.');
+  const data = await res.json();
+  return data.applications || [];
+}
+
+export async function decideAdminLawyerApplication(appId: string, decision: 'APPROVED' | 'REJECTED' | 'SUSPENDED', adminNotes?: string): Promise<any> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/admin/lawyer-applications/${appId}/decide`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ decision, adminNotes }),
+  });
+  if (!res.ok) throw new Error('Failed to record lawyer application decision.');
+  return res.json();
+}
+
+export async function fetchAdminSources(statusFilter?: string): Promise<any[]> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const url = statusFilter ? `/api/admin/sources?status=${encodeURIComponent(statusFilter)}` : '/api/admin/sources';
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error('Failed to fetch admin sources.');
+  const data = await res.json();
+  return data.sources || [];
+}
+
+export async function createAdminSource(sourceData: any): Promise<any> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/admin/sources', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(sourceData),
+  });
+  if (!res.ok) throw new Error('Failed to upload/create legal source.');
+  return res.json();
+}
+
+export async function updateAdminSourceStatus(sourceId: string, status: string, adminNotes?: string): Promise<any> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/admin/sources/${sourceId}/status`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ status, adminNotes }),
+  });
+  if (!res.ok) throw new Error('Failed to update legal source status.');
+  return res.json();
+}
+
+export async function fetchAdminAuditLogs(): Promise<any[]> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch('/api/admin/audit-logs', { headers });
+  if (!res.ok) throw new Error('Failed to fetch audit logs.');
+  const data = await res.json();
+  return data.logs || [];
+}
+

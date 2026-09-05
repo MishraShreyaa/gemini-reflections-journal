@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { authFetch } from './lib/api';
 import { 
   auth, 
   loginWithGoogle, 
@@ -18,6 +19,8 @@ import {
   deleteUserFinding,
   fetchUserDigests,
   saveUserDigest,
+  fetchServerUserProfile,
+  fetchApprovedGlobalSources
 } from './lib/firebase';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import type { 
@@ -30,7 +33,9 @@ import type {
   CaseComparison, 
   SavedFinding, 
   ResearchDigest, 
-  SupportedLanguage 
+  SupportedLanguage,
+  UserRole,
+  LawyerVerificationStatus
 } from './types';
 import { Navbar } from './components/Navbar';
 import { LandingView } from './components/LandingView';
@@ -43,16 +48,24 @@ import { StructuredCaseAnalysisView } from './components/StructuredCaseAnalysisV
 import { CaseComparisonView } from './components/CaseComparisonView';
 import { ResearchAssistantCanvas } from './components/ResearchAssistantCanvas';
 import { SavedFindingsView } from './components/SavedFindingsView';
+import { AdminDashboardView } from './components/AdminDashboardView';
+import { LawyerWorkspaceView } from './components/LawyerWorkspaceView';
+import { LawyerApplicationModal } from './components/LawyerApplicationModal';
 import { AlertCircle, CheckCircle, Menu, X, BookMarked } from 'lucide-react';
 
 export default function App() {
-  // Authentication & User State
+  // Authentication & Server RBAC User State
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('USER');
+  const [lawyerStatus, setLawyerStatus] = useState<LawyerVerificationStatus>('NONE');
+  const [barEnrollmentNumber, setBarEnrollmentNumber] = useState<string | undefined>(undefined);
+  const [stateBarCouncil, setStateBarCouncil] = useState<string | undefined>(undefined);
+  const [isSuspended, setIsSuspended] = useState<boolean>(false);
   const [authLoading, setAuthLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Active Workspace Navigation View
-  const [activeView, setActiveView] = useState<'library' | 'trace' | 'analysis' | 'comparison' | 'canvas' | 'findings' | 'journal'>('library');
+  const [activeView, setActiveView] = useState<'library' | 'trace' | 'analysis' | 'comparison' | 'canvas' | 'findings' | 'journal' | 'admin' | 'lawyer-workspace'>('library');
   const [language, setLanguage] = useState<SupportedLanguage>('en');
 
   // Legal Data States
@@ -83,12 +96,27 @@ export default function App() {
 
   // Modals & UI Controls
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState<boolean>(false);
+  const [isLawyerModalOpen, setIsLawyerModalOpen] = useState<boolean>(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', text: string) => {
     setToastMessage({ type, text });
     setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  // Helper to load or refresh server profile
+  const refreshServerProfile = async () => {
+    try {
+      const profile = await fetchServerUserProfile();
+      setUserRole(profile.role);
+      setLawyerStatus(profile.lawyerStatus);
+      setBarEnrollmentNumber(profile.barEnrollmentNumber);
+      setStateBarCouncil(profile.stateBarCouncil);
+      setIsSuspended(profile.isSuspended);
+    } catch (e) {
+      console.warn('Could not sync server profile:', e);
+    }
   };
 
   // Helper to create a fresh new research session
@@ -126,7 +154,7 @@ export default function App() {
     };
   }, []);
 
-  // Sync Firebase Auth & Load Isolated User Collections
+  // Sync Firebase Auth & Load Isolated User Collections + Authoritative Sources
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
       if (user) {
@@ -135,19 +163,49 @@ export default function App() {
         setAuthLoading(false);
         setAuthError(null);
 
-        // Load isolated user data collections
+        // Fetch Server Authoritative RBAC Profile
+        await refreshServerProfile();
+
+        // Load isolated user data collections & authoritative sources
         try {
-          const [userSources, userSessions, userFindings, userDigests, userEntries] = await Promise.all([
+          const [userSources, userSessions, userFindings, userDigests, userEntries, globalSources] = await Promise.all([
             fetchUserSources(profile.uid),
             fetchUserSessions(profile.uid),
             fetchUserFindings(profile.uid),
             fetchUserDigests(profile.uid),
             fetchUserEntries(profile.uid),
+            fetchApprovedGlobalSources().catch(() => []),
           ]);
 
-          setSources(userSources);
-          if (userSources.length > 0) {
-            setSelectedSource(userSources[0]);
+          // Merge user private sources with admin approved global precedents
+          const combinedSourcesMap = new Map<string, SourceDocument>();
+          globalSources.forEach((gs: any) => {
+            combinedSourcesMap.set(gs.id, {
+              id: gs.id,
+              userId: 'ADMIN_APPROVED',
+              title: gs.title,
+              citation: gs.citation,
+              court: gs.court,
+              judgmentDate: gs.date,
+              rawText: gs.rawText,
+              statutesReferenced: gs.statutesReferenced || [],
+              sourceType: 'judgment',
+              verificationStatus: 'verified',
+              sourceOrigin: 'COURT_RECORD',
+              isVerified: true,
+              uploadedAt: new Date(gs.uploadedAt || Date.now()).getTime(),
+              createdAt: new Date(gs.uploadedAt || Date.now()).getTime(),
+              updatedAt: new Date(gs.uploadedAt || Date.now()).getTime(),
+            });
+          });
+          userSources.forEach(us => {
+            combinedSourcesMap.set(us.id, us);
+          });
+
+          const finalSources = Array.from(combinedSourcesMap.values());
+          setSources(finalSources);
+          if (finalSources.length > 0) {
+            setSelectedSource(finalSources[0]);
           }
 
           setSessions(userSessions);
@@ -172,6 +230,8 @@ export default function App() {
         }
       } else {
         setCurrentUser(null);
+        setUserRole('USER');
+        setLawyerStatus('NONE');
         setSources([]);
         setSelectedSource(null);
         setRelationships([]);
@@ -246,9 +306,8 @@ export default function App() {
   const handleRunAnalysis = async (source: SourceDocument) => {
     setIsAnalyzing(true);
     try {
-      const response = await fetch('/api/nyaya/analyze-case', {
+      const response = await authFetch('/api/nyaya/analyze-case', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rawText: source.rawText,
           documentTitle: source.title,
@@ -257,11 +316,12 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Structured analysis service returned an error.');
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || 'Structured analysis service returned an error.');
       }
 
       const data = await response.json();
-      setActiveAnalysis(data.analysis);
+      setActiveAnalysis(data.analysis || data);
       setActiveView('analysis');
       showToast('success', `Completed structured analysis for "${source.title}".`);
     } catch (err: any) {
@@ -277,14 +337,14 @@ export default function App() {
     if (sources.length === 0) return;
     setIsTracing(true);
     try {
-      const response = await fetch('/api/nyaya/trace', {
+      const response = await authFetch('/api/nyaya/trace', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sources }),
+        body: JSON.stringify({ sources, rootCase: sources[0]?.title || 'Precedent' }),
       });
 
       if (!response.ok) {
-        throw new Error('Case trace extraction service returned an error.');
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || 'Case trace extraction service returned an error.');
       }
 
       const data = await response.json();
@@ -301,14 +361,14 @@ export default function App() {
   // Case Comparison Execution
   const handleCompareCases = async (caseDocs: SourceDocument[]): Promise<CaseComparison | null> => {
     try {
-      const response = await fetch('/api/nyaya/compare-cases', {
+      const response = await authFetch('/api/nyaya/compare-cases', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cases: caseDocs }),
       });
 
       if (!response.ok) {
-        throw new Error('Case comparison service returned an error.');
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || 'Case comparison service returned an error.');
       }
 
       const data = await response.json();
@@ -316,15 +376,15 @@ export default function App() {
         id: `comp_${Date.now()}`,
         userId: currentUser?.uid || '',
         casesCompared: data.casesCompared || [],
-        factsComparison: data.comparison.factsComparison || '',
-        issuesComparison: data.comparison.issuesComparison || '',
-        decisionComparison: data.comparison.decisionComparison || '',
-        ratioComparison: data.comparison.ratioComparison || '',
-        statutoryProvisionsComparison: data.comparison.statutoryProvisionsComparison || '',
-        treatmentOfPrecedents: data.comparison.treatmentOfPrecedents || '',
-        keySimilarities: data.comparison.keySimilarities || [],
-        keyDistinctions: data.comparison.keyDistinctions || [],
-        unverifiedObservations: data.comparison.unverifiedObservations || [],
+        factsComparison: data.comparison?.factsComparison || data.factsComparison || '',
+        issuesComparison: data.comparison?.issuesComparison || data.issuesComparison || '',
+        decisionComparison: data.comparison?.decisionComparison || data.decisionComparison || '',
+        ratioComparison: data.comparison?.ratioComparison || data.ratioComparison || '',
+        statutoryProvisionsComparison: data.comparison?.statutoryProvisionsComparison || data.statutoryProvisionsComparison || '',
+        treatmentOfPrecedents: data.comparison?.treatmentOfPrecedents || data.treatmentOfPrecedents || '',
+        keySimilarities: data.comparison?.keySimilarities || data.keySimilarities || [],
+        keyDistinctions: data.comparison?.keyDistinctions || data.keyDistinctions || [],
+        unverifiedObservations: data.comparison?.unverifiedObservations || data.unverifiedObservations || [],
         comparedAt: Date.now(),
       };
       return comp;
@@ -358,10 +418,10 @@ export default function App() {
     await saveUserSession(currentUser.uid, sessionWithUserMsg);
 
     try {
-      const response = await fetch('/api/nyaya/chat', {
+      const response = await authFetch('/api/nyaya/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          message: text,
           prompt: text,
           researchQuestion: activeSession.researchQuestion,
           sources,
@@ -374,7 +434,8 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Research inquiry assistant returned an error.');
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || 'Research inquiry assistant returned an error.');
       }
 
       const data = await response.json();
@@ -431,9 +492,8 @@ export default function App() {
     if (!currentUser || findings.length === 0) return;
     setIsGeneratingDigest(true);
     try {
-      const response = await fetch('/api/nyaya/digest', {
+      const response = await authFetch('/api/nyaya/digest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           findings,
           sessions,
@@ -442,19 +502,20 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error('Research digest service returned an error.');
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || 'Research digest service returned an error.');
       }
 
       const data = await response.json();
       const newDigest: ResearchDigest = {
         id: `digest_${Date.now()}`,
         userId: currentUser.uid,
-        periodLabel: data.digest.periodLabel || 'Research Period',
-        frequentlyResearchedTopics: data.digest.frequentlyResearchedTopics || [],
-        recurringLegalIssues: data.digest.recurringLegalIssues || [],
-        keyFindingsSummary: data.digest.keyFindingsSummary || '',
-        unresolvedQuestions: data.digest.unresolvedQuestions || [],
-        suggestedAvenuesForInvestigation: data.digest.suggestedAvenuesForInvestigation || [],
+        periodLabel: data.digest?.periodLabel || data.periodLabel || 'Research Period',
+        frequentlyResearchedTopics: data.digest?.frequentlyResearchedTopics || data.frequentlyResearchedTopics || [],
+        recurringLegalIssues: data.digest?.recurringLegalIssues || data.recurringLegalIssues || [],
+        keyFindingsSummary: data.digest?.keyFindingsSummary || data.keyFindingsSummary || '',
+        unresolvedQuestions: data.digest?.unresolvedQuestions || data.unresolvedQuestions || [],
+        suggestedAvenuesForInvestigation: data.digest?.suggestedAvenuesForInvestigation || data.suggestedAvenuesForInvestigation || [],
         generatedAt: Date.now(),
       };
 
@@ -534,8 +595,11 @@ export default function App() {
       {/* Top Navigation */}
       <Navbar
         user={currentUser}
+        userRole={userRole}
+        lawyerStatus={lawyerStatus}
         onLogout={handleLogout}
         onOpenSecurityModal={() => setIsSecurityModalOpen(true)}
+        onOpenLawyerModal={() => setIsLawyerModalOpen(true)}
         activeView={activeView}
         onSelectView={setActiveView}
         language={language}
@@ -555,6 +619,40 @@ export default function App() {
       ) : (
         <main className="flex-1">
           
+          {/* VIEW: ADMIN CONTROL PORTAL */}
+          {activeView === 'admin' && userRole === 'ADMIN' && (
+            <AdminDashboardView language={language} />
+          )}
+
+          {/* VIEW: LAWYER ADVOCATE WORKSPACE */}
+          {activeView === 'lawyer-workspace' && (userRole === 'LAWYER' || userRole === 'ADMIN') && (
+            <LawyerWorkspaceView
+              sources={sources}
+              sessions={sessions}
+              analyses={activeAnalysis ? [activeAnalysis] : []}
+              findings={findings}
+              language={language}
+              userRole={userRole}
+              lawyerStatus={lawyerStatus}
+              barEnrollmentNumber={barEnrollmentNumber}
+              stateBarCouncil={stateBarCouncil}
+              onOpenNewResearch={() => {
+                if (currentUser) {
+                  const newSess = createNewSession(currentUser.uid);
+                  setActiveSession(newSess);
+                  setSessions((prev) => [newSess, ...prev]);
+                  saveUserSession(currentUser.uid, newSess);
+                  setActiveView('canvas');
+                }
+              }}
+              onOpenFactSearch={() => setActiveView('canvas')}
+              onOpenCaseComparison={() => setActiveView('comparison')}
+              onOpenCaseTrace={() => setActiveView('trace')}
+              onOpenDigest={() => setActiveView('findings')}
+              onOpenSourceLibrary={() => setActiveView('library')}
+            />
+          )}
+
           {/* VIEW 1: SOURCE LIBRARY */}
           {activeView === 'library' && (
             <SourceLibraryView
@@ -706,6 +804,19 @@ export default function App() {
 
         </main>
       )}
+
+      {/* Lawyer Verification Application Modal */}
+      <LawyerApplicationModal
+        isOpen={isLawyerModalOpen}
+        onClose={() => setIsLawyerModalOpen(false)}
+        userEmail={currentUser?.email || null}
+        userName={currentUser?.displayName || null}
+        onSubmitted={() => {
+          refreshServerProfile();
+          showToast('success', 'Verification submitted! Your application is under administrator review.');
+        }}
+        language={language}
+      />
 
       {/* Security Threat Model & Isolation Modal */}
       <SecurityBadgeModal

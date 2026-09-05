@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { authFetch } from '../lib/api';
 import { 
   X, 
   FileText, 
@@ -40,23 +41,27 @@ export const SummarizeJudgmentModal: React.FC<SummarizeJudgmentModalProps> = ({
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/nyaya/summarize-judgment', {
+        const res = await authFetch('/api/nyaya/summarize-judgment', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             documentTitle: source.title,
+            caseName: source.title,
             sourceText: source.rawText,
+            judgmentText: source.rawText,
+            citation: source.citation,
+            court: source.court,
             language,
             userSituation: userSituation || '',
           }),
         });
 
         if (!res.ok) {
-          throw new Error('Failed to summarize judgment in plain language.');
+          const errData = await res.json().catch(() => null);
+          throw new Error(errData?.error || 'Failed to summarize judgment in plain language.');
         }
 
         const data = await res.json();
-        setSummaryData(data.summary);
+        setSummaryData(data.summary || data);
       } catch (err: any) {
         console.error('Error fetching summary:', err);
         setError(err.message || 'Failed to synthesize summary.');

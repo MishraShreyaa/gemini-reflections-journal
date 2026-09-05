@@ -1,37 +1,78 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Isolated user data root
+
+    // Helper functions for secure authorization
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'ADMIN' ||
+        (exists(/databases/$(database)/documents/userRoles/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/userRoles/$(request.auth.uid)).data.role == 'ADMIN')
+      );
+    }
+
+    // 1. User Private Data Isolation - Owners only
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
 
-      // Existing journal & interaction paths preserved
-      match /interactions/{interactionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
       match /entries/{entryId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
-
-      // NyayaTrace Legal Research Subcollections
+      match /interactions/{interactionId} {
+        allow read, write: if isOwner(userId);
+      }
       match /researchSessions/{sessionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
       match /sources/{sourceId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
       match /analyses/{analysisId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
       match /findings/{findingId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
       match /digests/{digestId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
       match /settings/{settingId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
+    }
+
+    // 2. Global Legal Sources: Read ADMIN_APPROVED for authenticated users, Admin for write
+    match /legalSources/{sourceId} {
+      allow read: if isAuthenticated() && (resource.data.status == 'ADMIN_APPROVED' || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 3. User Roles: Read own or Admin, Write Admin only
+    match /userRoles/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // 4. Lawyer Applications: Create own application, Read own or Admin, Review Admin only
+    match /lawyerApplications/{appId} {
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // 5. Audit Activity Logs: Read Admin only, Append by authenticated users/services, Immutable
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
     }
   }
 }

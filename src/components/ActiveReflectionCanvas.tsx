@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { authFetch } from '../lib/api';
 import { 
   Sparkles, 
   Send, 
@@ -152,9 +153,8 @@ export const ActiveReflectionCanvas: React.FC<ActiveReflectionCanvasProps> = ({
     setIsGenerating(true);
     setAiError(null);
     try {
-      const res = await fetch('/api/gemini/summarize', {
+      const res = await authFetch('/api/gemini/summarize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, title }),
       });
       if (!res.ok) throw new Error('Failed to generate title');
@@ -182,9 +182,8 @@ export const ActiveReflectionCanvas: React.FC<ActiveReflectionCanvasProps> = ({
 
     try {
       const fullContext = `${content}\n\n${interactions.map(m => `${m.role}: ${m.content}`).join('\n')}`;
-      const res = await fetch('/api/gemini/summarize', {
+      const res = await authFetch('/api/gemini/summarize', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: fullContext, title }),
       });
 
@@ -239,9 +238,8 @@ export const ActiveReflectionCanvas: React.FC<ActiveReflectionCanvasProps> = ({
         parts: [{ text: msg.content }],
       }));
 
-      const res = await fetch('/api/gemini/reflect', {
+      const res = await authFetch('/api/gemini/reflect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: userMessage.content,
           history: historyPayload,

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { authFetch } from '../lib/api';
 import { 
   Send, 
   Sparkles, 
@@ -46,6 +47,7 @@ import type {
   ExtractedFactElements
 } from '../types';
 import { getTranslation } from '../lib/i18n';
+import { FreeTextSearchCard } from './FreeTextSearchCard';
 import { PlainLanguageSearchCard } from './PlainLanguageSearchCard';
 import { AskJudgmentModal } from './AskJudgmentModal';
 import { SummarizeJudgmentModal } from './SummarizeJudgmentModal';
@@ -72,7 +74,7 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
   onSelectSource,
 }) => {
   // Search Mode & Inputs
-  const [searchMode, setSearchMode] = useState<ResearchSearchMode>('plain_language');
+  const [searchMode, setSearchMode] = useState<ResearchSearchMode>('free_text');
   const [plainInput, setPlainInput] = useState('');
   const [factInput, setFactInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -115,20 +117,24 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
     }
   }, [currentSession.messages, isLoading, activeTab]);
 
-  // Execute Fact-Based Search / Case Search / Plain Language Search
-  const handleExecuteSearch = async (queryText?: string) => {
+  // Execute Universal Free-Text Search / Fact Search / Case Search
+  const handleExecuteSearch = async (queryText?: string, modeToUse?: ResearchSearchMode) => {
+    const activeMode = modeToUse || searchMode;
     let textToSearch = queryText;
     if (!textToSearch) {
-      if (searchMode === 'plain_language') {
-        textToSearch = plainInput;
-      } else if (searchMode === 'facts_similarity') {
-        textToSearch = factInput;
-      } else {
-        textToSearch = searchQuery;
-      }
+      textToSearch = searchQuery || plainInput || factInput;
     }
     
     if (!textToSearch || !textToSearch.trim()) return;
+
+    // Synchronize all input states to prevent state drift
+    const cleanText = textToSearch.trim();
+    setSearchQuery(cleanText);
+    setPlainInput(cleanText);
+    setFactInput(cleanText);
+    if (modeToUse && modeToUse !== searchMode) {
+      setSearchMode(modeToUse);
+    }
 
     setIsFactSearching(true);
     setHasSearched(true);
@@ -144,12 +150,11 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
         minRelevance: minRelevance,
       };
 
-      const response = await fetch('/api/nyaya/fact-search', {
+      const response = await authFetch('/api/nyaya/fact-search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          searchMode,
-          query: textToSearch.trim(),
+          searchMode: activeMode,
+          query: cleanText,
           sources,
           filters,
           language,
@@ -157,7 +162,8 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
       });
 
       if (!response.ok) {
-        throw new Error('Failed to execute search across source repository.');
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.error || 'Failed to execute search across source repository.');
       }
 
       const data: FactSearchResponse = await response.json();
@@ -222,9 +228,11 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
   ];
 
   const testNonexistentCase = async () => {
-    setSearchMode('case_name_citation');
+    setSearchMode('free_text');
     setSearchQuery('State vs. Fictitious Case 1999');
-    await handleExecuteSearch('State vs. Fictitious Case 1999');
+    setPlainInput('State vs. Fictitious Case 1999');
+    setFactInput('State vs. Fictitious Case 1999');
+    await handleExecuteSearch('State vs. Fictitious Case 1999', 'free_text');
   };
 
   const hasActiveFilters = courtFilter !== 'all' || verifiedOnly || minRelevance > 0 || !!legalProvisionFilter.trim();
@@ -267,21 +275,37 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
       {/* Main Mode Selector Tabs */}
       <div className="bg-stone-100 p-1.5 rounded-xl border border-stone-300 flex flex-wrap items-center gap-1.5">
         
-        {/* New Core Mode: I Don't Know The Legal Term */}
+        {/* Prominent Universal Free Text Search */}
+        <button
+          type="button"
+          onClick={() => {
+            setSearchMode('free_text');
+            setActiveTab('search');
+          }}
+          className={`flex-1 min-w-[160px] px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+            searchMode === 'free_text' && activeTab === 'search'
+              ? 'bg-amber-500 text-stone-950 shadow-xs ring-2 ring-amber-400/40'
+              : 'bg-amber-50/80 text-amber-950 hover:bg-amber-100 border border-amber-300'
+          }`}
+        >
+          <Search className="w-4 h-4 text-amber-900" />
+          <span>🔍 Free Text Search</span>
+        </button>
+
         <button
           type="button"
           onClick={() => {
             setSearchMode('plain_language');
             setActiveTab('search');
           }}
-          className={`flex-1 min-w-[170px] px-3.5 py-2.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+          className={`flex-1 min-w-[140px] px-3.5 py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
             searchMode === 'plain_language' && activeTab === 'search'
-              ? 'bg-amber-500 text-stone-950 shadow-xs ring-2 ring-amber-400/40'
-              : 'bg-amber-50/80 text-amber-950 hover:bg-amber-100 border border-amber-300'
+              ? 'bg-amber-500 text-stone-950 shadow-xs'
+              : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-200'
           }`}
         >
-          <Sparkles className="w-4 h-4 text-amber-900" />
-          <span>💡 I Don't Know the Legal Term</span>
+          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+          <span>Plain Language</span>
         </button>
 
         <button
@@ -290,7 +314,7 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
             setSearchMode('facts_similarity');
             setActiveTab('search');
           }}
-          className={`flex-1 min-w-[150px] px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+          className={`flex-1 min-w-[140px] px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
             searchMode === 'facts_similarity' && activeTab === 'search'
               ? 'bg-amber-500 text-stone-950 shadow-xs'
               : 'bg-white text-stone-700 hover:bg-stone-200 border border-stone-200'
@@ -367,196 +391,24 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
       {activeTab === 'search' && (
         <div className="space-y-6">
           
-          {/* Dynamic Search Formulation Card based on mode */}
-          {searchMode === 'plain_language' ? (
-            <PlainLanguageSearchCard
-              plainInput={plainInput}
-              setPlainInput={setPlainInput}
-              onExecuteSearch={handleExecuteSearch}
-              isLoading={isFactSearching}
-              onToggleFilters={() => setShowFilters(!showFilters)}
-              showFilters={showFilters}
-              hasActiveFilters={hasActiveFilters}
-              onTestNonexistentCase={testNonexistentCase}
-              language={language}
-            />
-          ) : searchMode === 'facts_similarity' ? (
-            // Large Text Box for Fact-Based Search
-            <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs space-y-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-stone-900 uppercase tracking-wider flex items-center gap-1.5 font-serif">
-                    <FileSearch className="w-4 h-4 text-amber-600" />
-                    Describe the facts of your matter:
-                  </label>
-                  <span className="text-[11px] text-stone-500">
-                    System extracts parties, material events, chronology & disputed issues
-                  </span>
-                </div>
-                
-                <textarea
-                  rows={4}
-                  value={factInput}
-                  onChange={(e) => setFactInput(e.target.value)}
-                  placeholder="Describe the factual matrix of your matter in natural language... (e.g. The accused was arrested without being informed of the grounds of arrest and challenges the validity of custody under Article 22(1) and Section 50 CrPC)."
-                  className="w-full p-4 rounded-xl border border-stone-300 text-xs sm:text-sm text-stone-900 focus:ring-2 focus:ring-amber-500 bg-stone-50/50 resize-y leading-relaxed font-sans"
-                />
-
-                {/* Quick Verified Scenarios */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
-                    Verified Benchmark Scenarios:
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {sampleFactScenarios.map((sc, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setFactInput(sc.query);
-                          setLegalProvisionFilter(sc.provision);
-                        }}
-                        className="px-2.5 py-1 rounded-lg text-[11px] bg-stone-100 hover:bg-amber-50 text-stone-700 hover:text-amber-950 border border-stone-200 hover:border-amber-300 transition-colors cursor-pointer text-left font-medium"
-                      >
-                        ⚡ {sc.title}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Bar & Filter Toggle */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-stone-200">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                      showFilters || hasActiveFilters
-                        ? 'bg-amber-50 text-amber-900 border-amber-300'
-                        : 'bg-stone-50 text-stone-700 border-stone-300 hover:bg-stone-100'
-                    }`}
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-stone-500" />
-                    <span>Refine Search</span>
-                    {hasActiveFilters && (
-                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={testNonexistentCase}
-                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200 transition-colors cursor-pointer"
-                    title="Verify that NyayaTrace strictly refuses fictitious authorities like State vs. Fictitious Case 1999"
-                  >
-                    🧪 Test Nonexistent Case
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleExecuteSearch()}
-                  disabled={isFactSearching || !factInput.trim()}
-                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs sm:text-sm flex items-center space-x-2 disabled:opacity-50 transition-all cursor-pointer shadow-xs"
-                >
-                  {isFactSearching ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin text-stone-950" />
-                      <span>Extracting Facts & Cross-Verifying...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4 text-stone-950" />
-                      <span>Find Similar Verified Judgments</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          ) : (
-            // Single Line Search for Other Modes
-            <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-xs space-y-4">
-              <div className="space-y-3">
-                <label className="block text-xs font-bold text-stone-900 uppercase tracking-wider font-serif">
-                  {searchMode === 'case_name_citation' && 'Search by Case Name or Official Citation:'}
-                  {searchMode === 'section_statute' && 'Search by Statutory Act, Section, or Constitutional Article:'}
-                  {searchMode === 'legal_issue' && 'Search by Legal Question, Concept, or Doctrine:'}
-                </label>
-
-                <div className="flex items-center gap-3">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-stone-400" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder={
-                        searchMode === 'case_name_citation'
-                          ? 'e.g. Kesavananda Bharati v. State of Kerala, or (1973) 4 SCC 225'
-                          : searchMode === 'section_statute'
-                          ? 'e.g. Article 21, Section 438 CrPC, or Section 9 Arbitration Act'
-                          : 'e.g. Test of Arbitrariness, Right to Privacy, or Basic Structure Doctrine'
-                      }
-                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-300 text-xs sm:text-sm text-stone-900 focus:ring-2 focus:ring-amber-500 bg-white"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleExecuteSearch();
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Bar & Filter Toggle */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-stone-200">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                      showFilters || hasActiveFilters
-                        ? 'bg-amber-50 text-amber-900 border-amber-300'
-                        : 'bg-stone-50 text-stone-700 border-stone-300 hover:bg-stone-100'
-                    }`}
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-stone-500" />
-                    <span>Refine Search</span>
-                    {hasActiveFilters && (
-                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={testNonexistentCase}
-                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-200 transition-colors cursor-pointer"
-                    title="Verify that NyayaTrace strictly refuses fictitious authorities like State vs. Fictitious Case 1999"
-                  >
-                    🧪 Test Nonexistent Case
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleExecuteSearch()}
-                  disabled={isFactSearching || !searchQuery.trim()}
-                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-xs sm:text-sm flex items-center space-x-2 disabled:opacity-50 transition-all cursor-pointer shadow-xs"
-                >
-                  {isFactSearching ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin text-stone-950" />
-                      <span>Searching Authenticated Sources...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4 text-stone-950" />
-                      <span>Search Authenticated Sources</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Universal Free Text Search Card */}
+          <FreeTextSearchCard
+            query={searchQuery || plainInput || factInput}
+            setQuery={(val) => {
+              setSearchQuery(val);
+              setPlainInput(val);
+              setFactInput(val);
+            }}
+            searchMode={searchMode}
+            setSearchMode={setSearchMode}
+            onExecuteSearch={handleExecuteSearch}
+            isLoading={isFactSearching}
+            onToggleFilters={() => setShowFilters(!showFilters)}
+            showFilters={showFilters}
+            hasActiveFilters={hasActiveFilters}
+            onTestNonexistentCase={testNonexistentCase}
+            language={language}
+          />
 
           {/* Expandable Refinement Filters Panel */}
           {showFilters && (
@@ -799,6 +651,14 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
                                   <Building2 className="w-3.5 h-3.5 text-stone-400" />
                                   {result.court}
                                 </span>
+                                {result.benchStrength && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 text-[10px] font-semibold border border-blue-200">
+                                      {result.benchStrength}
+                                    </span>
+                                  </>
+                                )}
                                 <span>•</span>
                                 <span className="font-mono text-stone-700 font-medium">
                                   {result.citation}
@@ -809,6 +669,12 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
                                   {result.date}
                                 </span>
                               </div>
+                              {result.alternateCitations && result.alternateCitations.length > 0 && (
+                                <div className="text-[11px] text-stone-500 font-mono mt-1">
+                                  <span className="font-sans font-medium text-stone-600">Alternate Citations: </span>
+                                  {result.alternateCitations.join(' • ')}
+                                </div>
+                              )}
                             </div>
 
                             {/* Overall Score Badge */}
@@ -818,65 +684,70 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
                                 <span className="text-xl font-bold font-mono text-amber-600">
                                   {result.overallRelevanceScore}%
                                 </span>
+                                <span className="text-[9px] text-stone-400 font-mono">Weighted 40/30/20/10</span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Multi-Dimensional Relevance Indicators */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-stone-50 p-3 rounded-xl border border-stone-200 text-xs">
-                            
-                            <div>
-                              <div className="flex justify-between text-[11px] text-stone-600 mb-1">
-                                <span>Factual Similarity</span>
-                                <span className="font-mono font-bold text-stone-800">{result.factualSimilarityScore}%</span>
+                          {/* Multi-Dimensional Relevance Indicators with Transparent Formula */}
+                          <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 text-xs space-y-2">
+                            <div className="flex justify-between items-center text-[10px] text-stone-500 border-b border-stone-200/60 pb-1 font-mono">
+                              <span>TRANSPARENT SCORING BREAKDOWN</span>
+                              <span>Formula: 40% Legal + 30% Authority + 20% Facts + 10% Source Quality</span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                              <div>
+                                <div className="flex justify-between text-[11px] text-stone-600 mb-1">
+                                  <span>Legal Issue (40%)</span>
+                                  <span className="font-mono font-bold text-stone-800">{result.legalIssueMatchScore}%</span>
+                                </div>
+                                <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="bg-blue-600 h-full rounded-full"
+                                    style={{ width: `${result.legalIssueMatchScore}%` }}
+                                  ></div>
+                                </div>
                               </div>
-                              <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
-                                <div 
-                                  className="bg-amber-500 h-full rounded-full"
-                                  style={{ width: `${result.factualSimilarityScore}%` }}
-                                ></div>
+
+                              <div>
+                                <div className="flex justify-between text-[11px] text-stone-600 mb-1">
+                                  <span>Authority (30%)</span>
+                                  <span className="font-mono font-bold text-stone-800">{result.authorityRelevanceScore}%</span>
+                                </div>
+                                <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="bg-emerald-600 h-full rounded-full"
+                                    style={{ width: `${result.authorityRelevanceScore}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex justify-between text-[11px] text-stone-600 mb-1">
+                                  <span>Factual Similarity (20%)</span>
+                                  <span className="font-mono font-bold text-stone-800">{result.factualSimilarityScore}%</span>
+                                </div>
+                                <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="bg-amber-600 h-full rounded-full"
+                                    style={{ width: `${result.factualSimilarityScore}%` }}
+                                  ></div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="flex justify-between text-[11px] text-stone-600 mb-1">
+                                  <span>Source Quality (10%)</span>
+                                  <span className="font-mono font-bold text-stone-800">{result.sourceQualityScore ?? 100}%</span>
+                                </div>
+                                <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
+                                  <div 
+                                    className="bg-purple-600 h-full rounded-full"
+                                    style={{ width: `${result.sourceQualityScore ?? 100}%` }}
+                                  ></div>
+                                </div>
                               </div>
                             </div>
-
-                            <div>
-                              <div className="flex justify-between text-[11px] text-stone-600 mb-1">
-                                <span>Legal Issue Match</span>
-                                <span className="font-mono font-bold text-stone-800">{result.legalIssueMatchScore}%</span>
-                              </div>
-                              <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
-                                <div 
-                                  className="bg-blue-500 h-full rounded-full"
-                                  style={{ width: `${result.legalIssueMatchScore}%` }}
-                                ></div>
-                              </div>
-                            </div>
-
-                            <div>
-                              <div className="flex justify-between text-[11px] text-stone-600 mb-1">
-                                <span>Authority / Precedent</span>
-                                <span className="font-mono font-bold text-stone-800">{result.authorityRelevanceScore}%</span>
-                              </div>
-                              <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
-                                <div 
-                                  className="bg-emerald-500 h-full rounded-full"
-                                  style={{ width: `${result.authorityRelevanceScore}%` }}
-                                ></div>
-                              </div>
-                            </div>
-
-                            <div>
-                              <div className="flex justify-between text-[11px] text-stone-600 mb-1">
-                                <span>Overall Relevance</span>
-                                <span className="font-mono font-bold text-stone-800">{result.overallRelevanceScore}%</span>
-                              </div>
-                              <div className="w-full bg-stone-200 h-1.5 rounded-full overflow-hidden">
-                                <div 
-                                  className="bg-purple-500 h-full rounded-full"
-                                  style={{ width: `${result.overallRelevanceScore}%` }}
-                                ></div>
-                              </div>
-                            </div>
-
                           </div>
 
                           {/* Explanations */}
@@ -900,11 +771,19 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
                           </div>
 
                           {/* Verbatim Source Passage */}
-                          <div className="bg-amber-50/40 border-l-4 border-amber-500 p-3.5 rounded-r-xl space-y-1">
-                            <div className="flex items-center justify-between text-[10px] text-amber-900 font-semibold uppercase tracking-wider">
-                              <span className="flex items-center gap-1">
-                                <Quote className="w-3 h-3 text-amber-600" />
-                                Verbatim Supporting Source Passage:
+                          <div className={`p-3.5 rounded-r-xl space-y-1 border-l-4 ${
+                            result.isVerbatim !== false 
+                              ? 'bg-amber-50/50 border-amber-500' 
+                              : 'bg-stone-50 border-stone-400'
+                          }`}>
+                            <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider">
+                              <span className="flex items-center gap-1.5">
+                                <Quote className="w-3.5 h-3.5 text-amber-700" />
+                                {result.isVerbatim !== false ? (
+                                  <span className="text-amber-950 font-bold">Verbatim Source Text (Exact)</span>
+                                ) : (
+                                  <span className="text-stone-600 font-bold">AI Summary / Paraphrased</span>
+                                )}
                               </span>
                               <span className="font-mono text-stone-500">{result.passageLocation || 'Primary Record'}</span>
                             </div>
