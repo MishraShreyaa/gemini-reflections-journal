@@ -13,15 +13,17 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Lazy Google GenAI Client
+// Lazy Google GenAI Client with Dynamic Secret Key Rotation Support
+let currentApiKey = '';
 let aiClient: GoogleGenAI | null = null;
 function getAIClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || '';
+  if (!aiClient || apiKey !== currentApiKey) {
     if (!apiKey) {
       console.warn('GEMINI_API_KEY is not defined in environment variables. AI calls may fail.');
     }
-    aiClient = new GoogleGenAI({ apiKey: apiKey || '' });
+    currentApiKey = apiKey;
+    aiClient = new GoogleGenAI({ apiKey });
   }
   return aiClient;
 }
@@ -53,19 +55,41 @@ async function generateContentWithFallback(
       
       const contents: any[] = [];
       if (history && Array.isArray(history)) {
-        for (const msg of history) {
+        // Enforce sliding window (keep last 10 messages = 5 turns) to prevent token window overflow
+        const recentHistory = history.slice(-10);
+        for (const msg of recentHistory) {
           if (msg.role && msg.parts && Array.isArray(msg.parts)) {
-            contents.push({
-              role: msg.role,
-              parts: msg.parts.map(p => ({ text: String(p.text || '') })),
-            });
+            const role = msg.role === 'model' ? 'model' : 'user';
+            const text = msg.parts.map(p => String(p.text || '')).join('\n').trim();
+            if (text) {
+              // Ensure strict alternating roles
+              const last = contents[contents.length - 1];
+              if (last && last.role === role) {
+                last.parts[0].text += `\n\n${text}`;
+              } else {
+                contents.push({ role, parts: [{ text }] });
+              }
+            }
           }
         }
       }
-      contents.push({
-        role: 'user',
-        parts: [{ text: prompt }],
-      });
+
+      // Ensure conversation contents start with 'user'
+      if (contents.length > 0 && contents[0].role === 'model') {
+        contents.shift();
+      }
+
+      // If the last message in history is already 'user', merge the current prompt with it
+      // otherwise push the new user turn
+      const lastMsg = contents[contents.length - 1];
+      if (lastMsg && lastMsg.role === 'user') {
+        lastMsg.parts[0].text += `\n\n[FOLLOW-UP QUESTION / PROMPT]:\n${prompt}`;
+      } else {
+        contents.push({
+          role: 'user',
+          parts: [{ text: prompt }],
+        });
+      }
 
       const response = await ai.models.generateContent({
         model,
@@ -756,6 +780,9 @@ declare global {
   }
 }
 
+// Authoritative set of revoked/deleted user UIDs for edge-case token revocation
+const deletedUsersStore = new Set<string>();
+
 /**
  * Token decoder & verifier
  * Validates Firebase ID tokens (or dev/test tokens) and resolves server-controlled roles.
@@ -773,7 +800,7 @@ function verifyAuthAndResolveRole(req: Request): AuthenticatedUser | null {
     let uid = '';
     let email: string | null = null;
 
-    // 1. Check Dev / Security Test Token patterns: "dev-token-<role>-<uid>"
+    // 1. Check Dev / Security Test Token patterns: "dev-token-<role>-<uid>" or "test-token-<role>-<uid>"
     if (token.startsWith('dev-token-') || token.startsWith('test-token-')) {
       const parts = token.split('-');
       const requestedRole = parts[2]?.toUpperCase() as UserRole;
@@ -807,7 +834,29 @@ function verifyAuthAndResolveRole(req: Request): AuthenticatedUser | null {
       uid = decoded.user_id || decoded.sub || decoded.uid;
       email = decoded.email || null;
 
-      if (!uid) return null;
+      if (!uid || typeof uid !== 'string') {
+        console.warn('[Auth] Rejected token without valid uid/sub claim');
+        return null;
+      }
+
+      // Check Expiration (exp): Expired tokens MUST be rejected with 401
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (typeof decoded.exp === 'number' && decoded.exp < nowSec) {
+        console.warn(`[Auth] Rejected expired Firebase ID token: uid=${uid}, exp=${decoded.exp}, now=${nowSec}`);
+        return null;
+      }
+
+      // Check Issued At (iat): Reject future-issued tokens (clock skew tolerance: 300s)
+      if (typeof decoded.iat === 'number' && decoded.iat > nowSec + 300) {
+        console.warn(`[Auth] Rejected token with future iat: uid=${uid}, iat=${decoded.iat}, now=${nowSec}`);
+        return null;
+      }
+
+      // Edge case check: If account is deleted/revoked, reject token gracefully
+      if (deletedUsersStore.has(uid)) {
+        console.warn(`[Auth] Rejected token for deleted user: uid=${uid}`);
+        return null;
+      }
 
       // Check if user already has an authoritative role in the server store
       let userRecord = userRoleStore.get(uid);
@@ -838,25 +887,8 @@ function verifyAuthAndResolveRole(req: Request): AuthenticatedUser | null {
       return userRecord;
     }
 
-    // Fallback for simple raw UIDs in testing
-    if (token.length > 5 && !token.includes('.')) {
-      uid = token;
-      let userRecord = userRoleStore.get(uid);
-      if (!userRecord) {
-        userRecord = {
-          uid,
-          email: `${uid}@nyayatrace.user`,
-          role: 'USER',
-          lawyerStatus: 'NONE',
-          isSuspended: false,
-          assignedAt: Date.now(),
-          assignedBy: 'auto-registration',
-        };
-        userRoleStore.set(uid, userRecord);
-      }
-      return userRecord;
-    }
-
+    // In non-JWT cases, ONLY explicitly formatted test tokens (dev-token- / test-token-)
+    // are accepted. Raw strings (like "hacker_spoofed_admin" or arbitrary tokens) are strictly REJECTED.
     return null;
   } catch (err) {
     console.error('[Auth Error] Failed to decode/verify token:', err);
@@ -2246,9 +2278,25 @@ app.post('/api/nyaya/chat', requireAuthOrGuest, async (req, res) => {
 
     // 3. Deduplicate at the judgment level & score canonical judgments
     const canonicalJudgments = canonicalizeAndDeduplicateJudgments(candidateSources);
-    const queryConcepts = extractLegalQueryConcepts(message);
+
+    // Multi-turn context enhancement for follow-up queries:
+    // If the message is a conversational follow-up (e.g. "iske baare mein aur batao", "tell me more", "explain the ratio")
+    // or has few query concepts, incorporate context from previous turns to maintain RAG grounding.
+    let enrichedQuery = message;
+    if (history && history.length > 0) {
+      const priorUserMsgs = history.filter(h => h.role === 'user');
+      const lastUserMsg = priorUserMsgs.length > 0 ? priorUserMsgs[priorUserMsgs.length - 1] : null;
+      const lastUserText = lastUserMsg?.parts?.map(p => p.text).join(' ') || '';
+      
+      const currentConcepts = extractLegalQueryConcepts(message);
+      if (currentConcepts.tokens.length < 3 && lastUserText) {
+        enrichedQuery = `${lastUserText} ${message}`;
+      }
+    }
+
+    const queryConcepts = extractLegalQueryConcepts(enrichedQuery);
     const candidateJudgments: ScoredCanonicalJudgment[] = canonicalJudgments.map(canonical =>
-      scoreCanonicalJudgmentAgainstQuery(canonical, message, 'free_text', queryConcepts)
+      scoreCanonicalJudgmentAgainstQuery(canonical, enrichedQuery, 'free_text', queryConcepts)
     );
     candidateJudgments.sort((a, b) => b.overallScore - a.overallScore);
 

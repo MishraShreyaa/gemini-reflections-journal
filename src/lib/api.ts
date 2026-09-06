@@ -14,11 +14,11 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
-  } else if (auth.currentUser?.uid) {
-    headers.set('Authorization', `Bearer ${auth.currentUser.uid}`);
   } else {
-    // Guest fallback
-    headers.set('Authorization', `Bearer guest-session-${Date.now()}`);
+    // When logged out or guest, remove Authorization header to ensure protected endpoints reject with 401
+    headers.delete('Authorization');
+    const guestUid = auth.currentUser?.uid || `guest_${Date.now().toString(36)}`;
+    headers.set('x-guest-uid', guestUid);
   }
 
   return fetch(url, {
