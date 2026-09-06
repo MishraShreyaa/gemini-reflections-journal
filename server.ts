@@ -3,8 +3,32 @@ import path from 'path';
 import fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import admin from 'firebase-admin';
+import { getAuth } from 'firebase-admin/auth';
+import { initializeApp, applicationDefault, getApps } from 'firebase-admin/app';
 
 dotenv.config();
+
+// Initialize Firebase Admin once
+if (!getApps().length) {
+  try {
+    const cred = typeof (admin as any).credential?.applicationDefault === 'function'
+      ? (admin as any).credential.applicationDefault()
+      : applicationDefault();
+    initializeApp({
+      credential: cred,
+    });
+  } catch (initErr) {
+    console.warn('[Firebase Admin] Warning on applicationDefault() initialization:', initErr);
+    if (!getApps().length) {
+      initializeApp();
+    }
+  }
+}
+// Support both admin.auth() and getAuth()
+if (typeof (admin as any).auth !== 'function') {
+  (admin as any).auth = () => getAuth();
+}
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -784,10 +808,12 @@ declare global {
 const deletedUsersStore = new Set<string>();
 
 /**
- * Token decoder & verifier
- * Validates Firebase ID tokens (or dev/test tokens) and resolves server-controlled roles.
+ * Token decoder & verifier — FIXED VERSION
+ * Uses Firebase Admin SDK's verifyIdToken(), which validates the
+ * cryptographic signature against Google's public keys, checks
+ * expiry, issuer, audience, and revocation — not just a base64 decode.
  */
-function verifyAuthAndResolveRole(req: Request): AuthenticatedUser | null {
+async function verifyAuthAndResolveRole(req: Request): Promise<AuthenticatedUser | null> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null;
@@ -796,135 +822,115 @@ function verifyAuthAndResolveRole(req: Request): AuthenticatedUser | null {
   const token = authHeader.substring(7).trim();
   if (!token) return null;
 
+  // Dev/test token bypass — STRICTLY non-production only.
+  // This entire block is removed at build time in production if you
+  // additionally strip it via env-based dead code elimination, but the
+  // runtime guard below is the mandatory minimum.
+  if (process.env.NODE_ENV !== 'production' && (token.startsWith('dev-token-') || token.startsWith('test-token-'))) {
+    const parts = token.split('-');
+    const requestedRole = parts[2]?.toUpperCase() as UserRole;
+    const uid = parts.slice(3).join('-') || `dev-user-${Date.now()}`;
+    const email = `${uid}@test.nyayatrace.internal`;
+
+    let existing = userRoleStore.get(uid);
+    if (!existing) {
+      const role: UserRole = (requestedRole === 'ADMIN' || requestedRole === 'LAWYER') ? requestedRole : 'USER';
+      existing = {
+        uid,
+        email,
+        role,
+        lawyerStatus: role === 'LAWYER' ? 'APPROVED' : 'NONE',
+        isSuspended: false,
+        assignedAt: Date.now(),
+        assignedBy: 'test-runner',
+      };
+      userRoleStore.set(uid, existing);
+    }
+    return existing;
+  }
+
+  // In production, dev-token-/test-token- strings are just treated as
+  // regular tokens below and will fail real verification — no special
+  // casing, no silent acceptance.
+
   try {
-    let uid = '';
-    let email: string | null = null;
+    // This is the actual fix: verifyIdToken cryptographically verifies
+    // the signature, checks exp/iat, issuer ("https://securetoken.google.com/<project-id>"),
+    // audience (your Firebase project ID), and — if you pass `true` as the
+    // second argument — checks against Firebase's revocation list too.
+    const decoded = await (admin as any).auth().verifyIdToken(token, /* checkRevoked */ true);
 
-    // 1. Check Dev / Security Test Token patterns: "dev-token-<role>-<uid>" or "test-token-<role>-<uid>"
-    if (token.startsWith('dev-token-') || token.startsWith('test-token-')) {
-      const parts = token.split('-');
-      const requestedRole = parts[2]?.toUpperCase() as UserRole;
-      uid = parts.slice(3).join('-') || `dev-user-${Date.now()}`;
-      email = `${uid}@test.nyayatrace.internal`;
+    const uid = decoded.uid;
+    const email = decoded.email || null;
 
-      let existing = userRoleStore.get(uid);
-      if (!existing) {
-        const role: UserRole = (requestedRole === 'ADMIN' || requestedRole === 'LAWYER') ? requestedRole : 'USER';
-        existing = {
-          uid,
-          email,
-          role,
-          lawyerStatus: role === 'LAWYER' ? 'APPROVED' : 'NONE',
-          isSuspended: false,
-          assignedAt: Date.now(),
-          assignedBy: 'test-runner',
-        };
-        userRoleStore.set(uid, existing);
-      }
-      return existing;
+    if (!uid) {
+      console.warn('[Auth] Token verified but missing uid — should not happen with valid Firebase tokens');
+      return null;
     }
 
-    // 2. Decode standard JWT ID Token payload (Firebase Authentication format)
-    const tokenParts = token.split('.');
-    if (tokenParts.length === 3) {
-      const payloadBase64 = tokenParts[1].replace(/-/g, '+').replace(/_/g, '/');
-      const payloadJson = Buffer.from(payloadBase64, 'base64').toString('utf-8');
-      const decoded = JSON.parse(payloadJson);
-
-      uid = decoded.user_id || decoded.sub || decoded.uid;
-      email = decoded.email || null;
-
-      if (!uid || typeof uid !== 'string') {
-        console.warn('[Auth] Rejected token without valid uid/sub claim');
-        return null;
-      }
-
-      // Check Expiration (exp): Expired tokens MUST be rejected with 401
-      const nowSec = Math.floor(Date.now() / 1000);
-      if (typeof decoded.exp === 'number' && decoded.exp < nowSec) {
-        console.warn(`[Auth] Rejected expired Firebase ID token: uid=${uid}, exp=${decoded.exp}, now=${nowSec}`);
-        return null;
-      }
-
-      // Check Issued At (iat): Reject future-issued tokens (clock skew tolerance: 300s)
-      if (typeof decoded.iat === 'number' && decoded.iat > nowSec + 300) {
-        console.warn(`[Auth] Rejected token with future iat: uid=${uid}, iat=${decoded.iat}, now=${nowSec}`);
-        return null;
-      }
-
-      // Edge case check: If account is deleted/revoked, reject token gracefully
-      if (deletedUsersStore.has(uid)) {
-        console.warn(`[Auth] Rejected token for deleted user: uid=${uid}`);
-        return null;
-      }
-
-      // Check if user already has an authoritative role in the server store
-      let userRecord = userRoleStore.get(uid);
-
-      if (!userRecord) {
-        // Resolve Initial Role:
-        // Check if email matches Bootstrap Admin List
-        const isAdmin = email && BOOTSTRAP_ADMIN_EMAILS.has(email.toLowerCase());
-        const initialRole: UserRole = isAdmin ? 'ADMIN' : 'USER';
-
-        userRecord = {
-          uid,
-          email,
-          role: initialRole,
-          lawyerStatus: 'NONE',
-          isSuspended: false,
-          assignedAt: Date.now(),
-          assignedBy: isAdmin ? 'system-bootstrap' : 'default-registration',
-        };
-        userRoleStore.set(uid, userRecord);
-      }
-
-      // Check if suspended
-      if (userRecord.isSuspended) {
-        return { ...userRecord };
-      }
-
-      return userRecord;
+    // Edge case: account deleted/revoked after token issuance.
+    // checkRevoked=true above already handles token revocation via
+    // Firebase's revocation timestamp, but this catches accounts you've
+    // separately deleted from your own userRoleStore/deletedUsersStore.
+    if (deletedUsersStore.has(uid)) {
+      console.warn(`[Auth] Rejected token for deleted user: uid=${uid}`);
+      return null;
     }
 
-    // In non-JWT cases, ONLY explicitly formatted test tokens (dev-token- / test-token-)
-    // are accepted. Raw strings (like "hacker_spoofed_admin" or arbitrary tokens) are strictly REJECTED.
-    return null;
-  } catch (err) {
-    console.error('[Auth Error] Failed to decode/verify token:', err);
+    let userRecord = userRoleStore.get(uid);
+    if (!userRecord) {
+      const isAdmin = email && BOOTSTRAP_ADMIN_EMAILS.has(email.toLowerCase());
+      const initialRole: UserRole = isAdmin ? 'ADMIN' : 'USER';
+      userRecord = {
+        uid,
+        email,
+        role: initialRole,
+        lawyerStatus: 'NONE',
+        isSuspended: false,
+        assignedAt: Date.now(),
+        assignedBy: isAdmin ? 'system-bootstrap' : 'default-registration',
+      };
+      userRoleStore.set(uid, userRecord);
+    }
+
+    if (userRecord.isSuspended) {
+      return { ...userRecord };
+    }
+
+    return userRecord;
+  } catch (err: any) {
+    // verifyIdToken throws on: expired token, invalid signature, revoked
+    // token, malformed token, wrong project audience, etc. Log the code
+    // for debugging but never leak internals to the client.
+    console.warn(`[Auth] Token verification failed: ${err?.code || err?.message}`);
     return null;
   }
 }
 
-/**
- * Middleware: Requires any authenticated user (USER, LAWYER, ADMIN)
- */
-function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const user = verifyAuthAndResolveRole(req);
+// =========================================================================
+// MIDDLEWARE UPDATES — must now be async since verifyAuthAndResolveRole is async
+// =========================================================================
+
+async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const user = await verifyAuthAndResolveRole(req);
   if (!user) {
     return res.status(401).json({
       error: 'Unauthorized: Valid authentication credentials (Firebase ID Token) required.',
       code: 'UNAUTHENTICATED'
     });
   }
-
   if (user.isSuspended) {
     return res.status(403).json({
       error: 'Account Suspended: Your account has been suspended by an administrator.',
       code: 'ACCOUNT_SUSPENDED'
     });
   }
-
   req.user = user;
   next();
 }
 
-/**
- * Middleware: Accepts authenticated users or provides a safe guest user identity
- * for public research & search capabilities to prevent transient authorization dropouts.
- */
-function requireAuthOrGuest(req: Request, res: Response, next: NextFunction) {
-  let user = verifyAuthAndResolveRole(req);
+async function requireAuthOrGuest(req: Request, res: Response, next: NextFunction) {
+  let user = await verifyAuthAndResolveRole(req);
   if (!user) {
     const guestUid = (req.headers['x-guest-uid'] as string) || `guest-user-${Date.now().toString(36)}`;
     user = {
@@ -937,38 +943,31 @@ function requireAuthOrGuest(req: Request, res: Response, next: NextFunction) {
       assignedBy: 'guest-session',
     };
   }
-
   if (user.isSuspended) {
     return res.status(403).json({
       error: 'Account Suspended: Your account has been suspended by an administrator.',
       code: 'ACCOUNT_SUSPENDED'
     });
   }
-
   req.user = user;
   next();
 }
 
-/**
- * Middleware: Requires specific roles (e.g. ['ADMIN'] or ['LAWYER', 'ADMIN'])
- */
 function requireRole(allowedRoles: UserRole[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const user = verifyAuthAndResolveRole(req);
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const user = await verifyAuthAndResolveRole(req);
     if (!user) {
       return res.status(401).json({
         error: 'Unauthorized: Authentication required.',
         code: 'UNAUTHENTICATED'
       });
     }
-
     if (user.isSuspended) {
       return res.status(403).json({
         error: 'Account Suspended: Your account has been suspended by an administrator.',
         code: 'ACCOUNT_SUSPENDED'
       });
     }
-
     if (!allowedRoles.includes(user.role)) {
       logAudit(
         'UNAUTHORIZED_ACCESS_ATTEMPT',
@@ -984,7 +983,6 @@ function requireRole(allowedRoles: UserRole[]) {
         code: 'INSUFFICIENT_ROLE_PERMISSIONS'
       });
     }
-
     req.user = user;
     next();
   };
