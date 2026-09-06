@@ -64,6 +64,7 @@ export interface SharedLegalSource {
   isVerified: boolean;
   statutesReferenced?: string[];
   keyTopics?: string[];
+  category?: string;
   pageCount?: number;
   url?: string;
 }
@@ -237,6 +238,7 @@ export interface FactSearchResult {
   isVerbatim?: boolean; // True if exact match with authenticated source text
   alternateCitations?: string[]; // Merged citations from deduplicated records
   benchStrength?: string; // e.g. "13-Judge Constitution Bench"
+  category?: string;
   comparisonDetails: {
     userFacts: string[];
     judgmentFacts: string[];
@@ -268,6 +270,11 @@ export interface FactSearchResponse {
   systemNotice: string;
   modelUsed?: string;
   searchedSourcesCount: number;
+  canonicalJudgmentsCount?: number;
+  citationConfidence?: CitationConfidence;
+  actionBlock?: ActionBlock;
+  category?: string;
+  scopedByCategory?: boolean;
 }
 
 export interface SourceDocument {
@@ -352,6 +359,35 @@ export interface CaseAnalysis {
   modelUsed?: string;
 }
 
+export type ConfidenceLabel = 'High' | 'Medium' | 'Low';
+
+export interface CitationConfidence {
+  confidence_score: number; // 0 - 100 or 0.0 - 1.0
+  confidence_label: ConfidenceLabel;
+  source: string;
+  citation: string;
+  disclaimer?: string;
+}
+
+export interface ActionBlock {
+  category: string;
+  templateName: string;
+  authority: string;
+  forum: string;
+  steps: string[];
+  draftTitle?: string;
+  draftSnippet?: string;
+  actionType?: string;
+}
+
+export type SituationCategory = 
+  | 'CRIMINAL_ARREST' 
+  | 'CONSUMER_DISPUTE' 
+  | 'TENANCY_PROPERTY' 
+  | 'LABOR_SALARY' 
+  | 'CONSTITUTIONAL_LAW' 
+  | 'GENERAL_LEGAL';
+
 export interface ResearchChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'model';
@@ -366,6 +402,9 @@ export interface ResearchChatMessage {
   }>;
   supportingSourceIds?: string[];
   modelUsed?: string;
+  citationConfidence?: CitationConfidence;
+  actionBlock?: ActionBlock;
+  category?: string;
 }
 
 // Alias for convenience
@@ -385,6 +424,8 @@ export interface ResearchSession {
   caseTraceRelationships?: CaseRelationship[];
   status?: 'active' | 'archived';
   language?: SupportedLanguage;
+  isZeroRetention?: boolean;
+  category?: string;
   createdAt: number;
   updatedAt: number;
 }

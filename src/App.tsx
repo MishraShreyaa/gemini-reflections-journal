@@ -396,9 +396,11 @@ export default function App() {
   };
 
   // Multi-Turn Chat Messaging in Research Assistant Canvas
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, category?: string, isZeroRetention?: boolean) => {
     if (!currentUser || !activeSession) return;
     setIsRespondingToChat(true);
+
+    const isZero = isZeroRetention === true || activeSession.isZeroRetention === true;
 
     const userMessage = {
       id: `msg_${Date.now()}_user`,
@@ -411,11 +413,14 @@ export default function App() {
     const sessionWithUserMsg = {
       ...activeSession,
       messages: updatedMessages,
+      isZeroRetention: isZero,
       updatedAt: Date.now(),
     };
 
     setActiveSession(sessionWithUserMsg);
-    await saveUserSession(currentUser.uid, sessionWithUserMsg);
+    if (!isZero) {
+      await saveUserSession(currentUser.uid, sessionWithUserMsg);
+    }
 
     try {
       const response = await authFetch('/api/nyaya/chat', {
@@ -430,6 +435,9 @@ export default function App() {
             parts: [{ text: m.content }],
           })),
           language,
+          category,
+          isZeroRetention: isZero,
+          sessionId: activeSession.id,
         }),
       });
 
@@ -445,6 +453,9 @@ export default function App() {
         content: data.reply,
         classification: data.classification || 'AI_ANALYSIS',
         supportingSourceIds: sources.map((s) => s.id),
+        citationConfidence: data.citationConfidence,
+        actionBlock: data.actionBlock,
+        category: data.category,
         timestamp: Date.now(),
       };
 
@@ -455,7 +466,9 @@ export default function App() {
       };
 
       setActiveSession(finalSession);
-      await saveUserSession(currentUser.uid, finalSession);
+      if (!isZero) {
+        await saveUserSession(currentUser.uid, finalSession);
+      }
     } catch (err: any) {
       console.error('Chat inquiry error:', err);
       showToast('error', err.message || 'Failed to generate legal response.');

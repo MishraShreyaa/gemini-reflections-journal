@@ -145,6 +145,7 @@ interface SharedLegalSourceRecord {
   isVerified: boolean;
   statutesReferenced?: string[];
   keyTopics?: string[];
+  category?: string;
   pageCount?: number;
   url?: string;
 }
@@ -225,6 +226,7 @@ const INITIAL_LEGAL_SOURCES: SharedLegalSourceRecord[] = [
     adminReviewNotes: 'Verified from Supreme Court of India official judgment repository. Class-I preferential heir right under Section 22 HSA on agricultural land.',
     statutesReferenced: ['Section 22, Hindu Succession Act, 1956', 'Section 4(2), Hindu Succession Act, 1956'],
     keyTopics: ['Hindu Succession', 'Preferential Right of Pre-emption', 'Agricultural Land', 'Class-I Heirs'],
+    category: 'SUCCESSION_PROPERTY',
     rawText: `SUPREME COURT OF INDIA
 CIVIL APPELLATE JURISDICTION
 CIVIL APPEAL NO. 2553 OF 2019 (Arising out of SLP (C) No. 31039 of 2018)
@@ -253,6 +255,7 @@ JUDGMENT: Uday Umesh Lalit, J.
     adminReviewNotes: 'Verified Supreme Court precedent. Section 6 Hindu Succession Act conferring equal coparcenary rights on daughters by birth.',
     statutesReferenced: ['Section 6, Hindu Succession Act, 1956 (as amended by Act 39 of 2005)'],
     keyTopics: ['Hindu Succession', 'Coparcenary Rights', 'Daughters Rights by Birth', 'Partition'],
+    category: 'SUCCESSION_PROPERTY',
     rawText: `SUPREME COURT OF INDIA
 CIVIL APPELLATE JURISDICTION
 CIVIL APPEAL NOS. 188-189 OF 2018
@@ -280,6 +283,7 @@ JUDGMENT: A.K. Sikri, J.
     adminReviewNotes: 'Verified Constitutional Landmark on Christian women succession rights in Travancore-Cochin.',
     statutesReferenced: ['Part-B States (Laws) Act, 1951', 'Indian Succession Act, 1925', 'Travancore Christian Succession Act, 1092'],
     keyTopics: ['Christian Succession', 'Equal Rights of Daughters', 'Repeal of Discriminatory Personal Laws', 'Article 14'],
+    category: 'SUCCESSION_PROPERTY',
     rawText: `SUPREME COURT OF INDIA
 ORIGINAL JURISDICTION
 WRIT PETITION NOS. 1073-1074 OF 1983
@@ -306,6 +310,7 @@ JUDGMENT: P.N. Bhagwati, C.J.
     adminReviewNotes: 'Supreme Court ruling holding Section 6(1) prospective. (Note: Subsequently clarified/partially overruled in Vineeta Sharma v. Rakesh Sharma).',
     statutesReferenced: ['Section 6, Hindu Succession Act, 1956 (as amended by Act 39 of 2005)'],
     keyTopics: ['Hindu Succession', 'Prospective Application', 'Coparcenary Rights', 'Living Coparceners'],
+    category: 'SUCCESSION_PROPERTY',
     rawText: `SUPREME COURT OF INDIA
 CIVIL APPELLATE JURISDICTION
 CIVIL APPEAL NO. 7217 OF 2013
@@ -332,6 +337,7 @@ JUDGMENT: Adarsh Kumar Goel, J.
     adminReviewNotes: 'Verified High Court of Himachal Pradesh judgment affirming application of Section 22 HSA to agricultural land.',
     statutesReferenced: ['Section 22, Hindu Succession Act, 1956', 'Himachal Pradesh Tenancy and Land Reforms Act, 1972'],
     keyTopics: ['Hindu Succession', 'Preferential Right', 'Agricultural Land', 'Section 22 HSA'],
+    category: 'TENANCY_PROPERTY',
     rawText: `HIGH COURT OF HIMACHAL PRADESH AT SHIMLA
 REGULAR SECOND APPEAL NO. 258 OF 2012
 Roshan Lal (since deceased) through LRs ...Appellants
@@ -358,6 +364,7 @@ JUDGMENT: Tarlok Singh Chauhan, J.
     adminReviewNotes: 'Landmark 3-Judge Supreme Court ruling establishing retroactive coparcenary rights of daughters by birth under Section 6 HSA.',
     statutesReferenced: ['Section 6, Hindu Succession Act, 1956 (as amended by Act 39 of 2005)'],
     keyTopics: ['Hindu Succession', 'Daughters Coparcenary Rights', 'Retroactive Operation', 'Overruling of Prakash v. Phulavati'],
+    category: 'SUCCESSION_PROPERTY',
     rawText: `SUPREME COURT OF INDIA
 CIVIL APPELLATE JURISDICTION
 CIVIL APPEAL NO. 32601 OF 2018
@@ -385,6 +392,7 @@ JUDGMENT: Arun Mishra, J. (For the 3-Judge Bench)
     adminReviewNotes: 'Foundational 13-Judge Constitution Bench ruling on Basic Structure Doctrine.',
     statutesReferenced: ['Article 368', 'Article 13', 'Article 31C', 'Constitution of India'],
     keyTopics: ['Basic Structure Doctrine', 'Constitutional Amendments', 'Judicial Review'],
+    category: 'CONSTITUTIONAL_LAW',
     rawText: `SUPREME COURT OF INDIA
 WRIT PETITION (CIVIL) NO. 135 OF 1970
 Kesavananda Bharati Sripadagalvaru and Ors. ...Petitioners
@@ -410,6 +418,7 @@ JUDGMENT: S.M. Sikri, C.J. et al. (13-Judge Bench)
     adminReviewNotes: 'Landmark ruling on Article 21 substantive due process and Golden Triangle.',
     statutesReferenced: ['Article 21', 'Article 14', 'Article 19', 'Passports Act, 1967'],
     keyTopics: ['Personal Liberty', 'Golden Triangle', 'Natural Justice', 'Substantive Due Process'],
+    category: 'CONSTITUTIONAL_LAW',
     rawText: `SUPREME COURT OF INDIA
 WRIT PETITION (CIVIL) NO. 231 OF 1977
 Maneka Gandhi ...Petitioner
@@ -436,6 +445,7 @@ JUDGMENT: M.H. Beg, C.J., P.N. Bhagwati, J. et al.
     adminReviewNotes: 'Mandatory guidelines for arrest, detention, and custodial safeguards under Article 21 & 22.',
     statutesReferenced: ['Article 21', 'Article 22', 'Code of Criminal Procedure, 1973'],
     keyTopics: ['Custodial Violence', 'Arrest Guidelines', 'Arrest Memo', 'Inspection Memo'],
+    category: 'CRIMINAL_ARREST',
     rawText: `SUPREME COURT OF INDIA
 WRIT PETITION (CRL.) NO. 592 OF 1987
 D.K. Basu ...Petitioner
@@ -466,6 +476,7 @@ JUDGMENT: Kuldip Singh, J. & A.S. Anand, J.
     adminReviewNotes: 'Authoritative ruling on tenancy rights, recovery of possession, security deposit refunds, and prevention of arbitrary landlord deductions.',
     statutesReferenced: ['Delhi Rent Control Act, 1958', 'Transfer of Property Act, 1882 (Section 106)'],
     keyTopics: ['Tenancy Law', 'Security Deposit Refund', 'Arbitrary Deductions', 'Vacant Possession', 'Landlord and Tenant Rights'],
+    category: 'TENANCY_PROPERTY',
     rawText: `SUPREME COURT OF INDIA
 CIVIL APPELLATE JURISDICTION
 CIVIL APPEAL NO. 3996 OF 2018
@@ -493,6 +504,7 @@ JUDGMENT: N.V. Ramana, J. & S. Abdul Nazeer, J.
     adminReviewNotes: 'Foundational Supreme Court precedent on Consumer Protection, deficiency in service, defective products, and statutory entitlement to refund.',
     statutesReferenced: ['Consumer Protection Act, 1986', 'Consumer Protection Act, 2019'],
     keyTopics: ['Consumer Protection', 'Deficiency in Service', 'Defective Products', 'Right to Refund', 'Unfair Trade Practice'],
+    category: 'CONSUMER_DISPUTE',
     rawText: `SUPREME COURT OF INDIA
 CIVIL APPELLATE JURISDICTION
 CIVIL APPEAL NO. 6237 OF 1990
@@ -520,6 +532,7 @@ JUDGMENT: R.M. Sahai, J. (For the Bench)
     adminReviewNotes: 'Supreme Court ruling holding earned salary, gratuity, and terminal benefits are constitutional property under Article 300A that cannot be withheld arbitrarily.',
     statutesReferenced: ['Article 300A, Constitution of India', 'Article 21, Constitution of India', 'Payment of Wages Act, 1936'],
     keyTopics: ['Withholding of Salary', 'Payment of Wages', 'Gratuity and Terminal Dues', 'Article 300A Property Rights', 'Service Jurisprudence'],
+    category: 'LABOR_SALARY',
     rawText: `SUPREME COURT OF INDIA
 CIVIL APPELLATE JURISDICTION
 CIVIL APPEAL NO. 6770 OF 2013
@@ -547,6 +560,7 @@ JUDGMENT: K.S. Radhakrishnan, J. & A.K. Sikri, J.
     adminReviewNotes: 'Mandatory Supreme Court directives preventing arbitrary police arrests and requiring Section 41A CrPC notice of appearance.',
     statutesReferenced: ['Section 41, Code of Criminal Procedure, 1973', 'Section 41A, CrPC', 'Article 21, Constitution of India'],
     keyTopics: ['Arrest Safeguards', 'Section 41A CrPC Notice', 'Preventing Arbitrary Detention', 'Police Accountability'],
+    category: 'CRIMINAL_ARREST',
     rawText: `SUPREME COURT OF INDIA
 CRIMINAL APPELLATE JURISDICTION
 SPECIAL LEAVE PETITION (CRL.) NO. 9127 OF 2013
@@ -574,6 +588,7 @@ JUDGMENT: Chandramauli Kr. Prasad, J. & Pinaki Chandra Ghose, J.
     adminReviewNotes: 'Unanimous 9-Judge Constitution Bench affirming the fundamental Right to Privacy under Article 21.',
     statutesReferenced: ['Article 21, Constitution of India', 'Article 14', 'Article 19', 'Aadhaar Act, 2016'],
     keyTopics: ['Right to Privacy', 'Informational Privacy', 'Biometrics', 'Proportionality Standard', 'Fundamental Rights'],
+    category: 'CONSTITUTIONAL_LAW',
     rawText: `SUPREME COURT OF INDIA
 CIVIL ORIGINAL JURISDICTION
 WRIT PETITION (CIVIL) NO. 494 OF 2012
@@ -591,6 +606,142 @@ JUDGMENT: J.S. Khehar, C.J., J. Chelameswar, S.A. Bobde, R.K. Agrawal, R.F. Nari
 for (const src of INITIAL_LEGAL_SOURCES) {
   legalSourcesStore.set(src.id, src);
 }
+
+// =========================================================================
+// ACTION TEMPLATES & SITUATION GUIDED CATEGORIES (Feature 2 & 4)
+// =========================================================================
+
+interface ActionTemplate {
+  category: string;
+  templateName: string;
+  authority: string;
+  forum: string;
+  steps: string[];
+  draftTitle: string;
+  draftSnippet: string;
+  actionType: string;
+}
+
+const ACTION_TEMPLATES: Record<string, ActionTemplate> = {
+  CRIMINAL_ARREST: {
+    category: 'CRIMINAL_ARREST',
+    templateName: 'Section 41A CrPC Notice of Appearance & Representation',
+    authority: 'Investigating Officer / Police Station House Officer (SHO)',
+    forum: 'Jurisdictional Magistrate (CrPC 156(3)) / High Court (Article 226)',
+    steps: [
+      'Demand a signed, stamped copy of Notice of Appearance under Section 41A CrPC specifying time, date, and allegations.',
+      'For offenses punishable with ≤ 7 years imprisonment, verify that police have filled the mandatory Section 41(1)(b) checklist.',
+      'Submit written reply acknowledging notice, confirming willingness to cooperate, and securing an official stamped acknowledgment.',
+      'If threatened with arbitrary arrest without checklist or notice, immediately file Anticipatory Bail (Sec 438 CrPC) citing Arnesh Kumar (2014) 8 SCC 273 and D.K. Basu guidelines.'
+    ],
+    draftTitle: 'Formal Representation to Investigating Officer under Section 41A CrPC',
+    draftSnippet: 'To, The Station House Officer... In Re: Notice / Inquiry No... I submit my formal appearance under Section 41A CrPC in strict compliance with the Supreme Court mandates in Arnesh Kumar v. State of Bihar ((2014) 8 SCC 273). I undertake to cooperate with the lawful inquiry and request acknowledgment of this receipt.',
+    actionType: 'statutory_notice'
+  },
+  CONSUMER_DISPUTE: {
+    category: 'CONSUMER_DISPUTE',
+    templateName: 'Consumer Pre-Litigation Legal Notice & Form 1 Complaint',
+    authority: 'District Consumer Disputes Redressal Commission (DCDRC)',
+    forum: 'e-Daakhil Portal / District Consumer Forum (Claims up to ₹50 Lakhs)',
+    steps: [
+      'Issue a formal 15-day Legal Demand Notice demanding immediate full refund and interest under Section 35 Consumer Protection Act 2019.',
+      'Compile documentary evidence: tax invoice, proof of payment, delivery slip, defect photos/video, and customer support ticket logs.',
+      'Lodge free online grievance on National Consumer Helpline (consumerhelpline.gov.in / 1915).',
+      'If unresolved in 15 days, file formal complaint before District Consumer Commission citing Lucknow Development Authority v. M.K. Gupta ((1994) 1 SCC 243) holding unilateral "as-is" clauses void.'
+    ],
+    draftTitle: 'Formal Demand Notice under Consumer Protection Act 2019',
+    draftSnippet: 'To, [Seller / Service Provider]... Subject: Formal Notice for Full Refund of ₹[Amount] on Account of Defective Goods / Deficiency in Service... Take notice that under the Consumer Protection Act, 2019 and the Supreme Court precedent in Lucknow Development Authority v. M.K. Gupta, your refusal to refund constitutes an unfair trade practice...',
+    actionType: 'consumer_complaint'
+  },
+  TENANCY_PROPERTY: {
+    category: 'TENANCY_PROPERTY',
+    templateName: 'Legal Notice for Full Refund of Tenant Security Deposit',
+    authority: 'Rent Controller / Civil Court (Suit for Recovery of Money)',
+    forum: 'Rent Authority / Small Causes Court / Jurisdictional Civil Judge',
+    steps: [
+      'Issue 15-day formal Legal Notice demanding full refund of security deposit with 18% p.a. interest.',
+      'Attach proof of peaceful handover of vacant possession (key handover receipt, photos of cleaned premises, utility bill NOCs).',
+      'Demand certified itemized repair bills and GST receipts for any alleged painting or wear-and-tear deductions.',
+      'Cite Supreme Court judgment in Suresh Kumar Kohli v. Rakesh Jain ((2018) 6 SCC 708) holding that arbitrary retention of deposit without documented structural damage is unlawful enrichment.'
+    ],
+    draftTitle: 'Legal Demand Notice for Recovery of Tenant Security Deposit',
+    draftSnippet: 'To Landlord... Subject: Demand for Immediate Refund of Security Deposit of ₹[Amount] post peaceful surrender of premises... Whereas peaceful possession of Flat No... was handed over on [Date]... as held by the Hon’ble Supreme Court in Suresh Kumar Kohli v. Rakesh Jain, arbitrary deductions without authentic invoices constitute illegal retention...',
+    actionType: 'recovery_notice'
+  },
+  LABOR_SALARY: {
+    category: 'LABOR_SALARY',
+    templateName: 'Statutory Demand for Unpaid Wages & Gratuity',
+    authority: 'Assistant Labor Commissioner / Controlling Authority under Payment of Gratuity Act',
+    forum: 'Labor Court / High Court (Writ Petition under Article 226)',
+    steps: [
+      'Issue formal demand letter to employer demanding disbursement of earned salary and terminal settlement within 7 days.',
+      'File complaint before the Labor Commissioner under Section 15 of Payment of Wages Act, 1936 or Industrial Disputes Act.',
+      'For withheld gratuity (5+ years service), file Form N application before the Controlling Authority claiming 10% statutory interest.',
+      'Cite State of Jharkhand v. Jitendra Kumar Srivastava ((2013) 12 SCC 210) affirming that earned salary is protected property under Article 300A and cannot be withheld without express law.'
+    ],
+    draftTitle: 'Statutory Demand Notice for Withheld Wages and Gratuity',
+    draftSnippet: 'To, Management / HR... Subject: Statutory Demand for Immediate Release of Earned Salary and Gratuity Dues... You are hereby called upon to pay unpaid salary of ₹[Amount]... Earned wages constitute constitutional property under Article 300A as held in State of Jharkhand v. Jitendra Kumar Srivastava...',
+    actionType: 'wages_demand'
+  },
+  CONSTITUTIONAL_LAW: {
+    category: 'CONSTITUTIONAL_LAW',
+    templateName: 'Writ Petition Representation under Article 226 / 32',
+    authority: 'High Court / Supreme Court of India',
+    forum: 'Constitutional Writ Jurisdiction (Articles 32 & 226)',
+    steps: [
+      'Identify the specific fundamental right infringed under Part III (Articles 14, 19, 21).',
+      'Issue preliminary representation to respondent authority granting opportunity to rectify violation.',
+      'Apply the threefold proportionality test established in K.S. Puttaswamy (2017) 10 SCC 1: Legality, Legitimate State Aim, and Proportionality.',
+      'File Writ Petition (Mandamus/Certiorari/Habeas Corpus) before High Court.'
+    ],
+    draftTitle: 'Formal Representation prior to filing Constitutional Writ Petition',
+    draftSnippet: 'To, [Competent Authority]... Subject: Representation against Infringement of Fundamental Rights under Article 21... The impugned action fails the three-fold proportionality test mandated in Justice K.S. Puttaswamy v. Union of India...',
+    actionType: 'writ_representation'
+  }
+};
+
+/**
+ * Lightweight classification (Regex / keyword rules)
+ * Bypasses expensive LLM calls for speed and efficiency.
+ */
+function classifySituationCategory(query: string): string {
+  const q = query.toLowerCase();
+  if (/arrest|police|custod|fir|bail|41a|warrant|lockup|remand|detention/i.test(q)) {
+    return 'CRIMINAL_ARREST';
+  }
+  if (/consumer|defect|refund|warranty|amazon|flipkart|seller|e-commerce|delivery|service provider|damaged product|broken product/i.test(q)) {
+    return 'CONSUMER_DISPUTE';
+  }
+  if (/landlord|tenant|tenancy|security deposit|rent|painting|maintenance|vacat|lease|flat|evict/i.test(q)) {
+    return 'TENANCY_PROPERTY';
+  }
+  if (/salary|wage|gratuity|pf|provident|employer|resignation|bonus|terminal dues|unpaid|employee|employment/i.test(q)) {
+    return 'LABOR_SALARY';
+  }
+  if (/privacy|aadhaar|biometric|article 21|fundamental right|basic structure|constitution/i.test(q)) {
+    return 'CONSTITUTIONAL_LAW';
+  }
+  return 'GENERAL_LEGAL';
+}
+
+// In-memory zero-retention / ephemeral session store (TTL: 1 hour)
+interface EphemeralSessionRecord {
+  id: string;
+  messages: any[];
+  createdAt: number;
+  expiresAt: number;
+}
+const ephemeralSessionsStore = new Map<string, EphemeralSessionRecord>();
+
+// Cleanup expired ephemeral sessions periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, s] of ephemeralSessionsStore.entries()) {
+    if (s.expiresAt < now) {
+      ephemeralSessionsStore.delete(id);
+    }
+  }
+}, 300000);
 
 // =========================================================================
 // AUTHENTICATION & AUTHORIZATION MIDDLEWARES
@@ -2036,28 +2187,133 @@ app.post('/api/nyaya/chat', requireAuthOrGuest, async (req, res) => {
     const incomingSources = Array.isArray(body.sources) ? body.sources : [];
     const language = typeof body.language === 'string' ? body.language : 'en';
     const history = Array.isArray(body.history) ? body.history : [];
-
-    // Filter to only verified / approved sources
-    const sources = filterToAuthoritativeSources(incomingSources);
+    const isZeroRetention = body.isZeroRetention === true || body.saveConversation === false;
+    const sessionId = typeof body.sessionId === 'string' ? body.sessionId : undefined;
 
     if (!message) {
       return res.status(400).json({ error: 'Research query or proposition is required.' });
     }
 
+    // 1. Feature 4: Situation Category Scoping
+    const explicitCategory = (typeof body.category === 'string' && body.category.trim()) ? body.category.trim() : null;
+    const detectedCategory = explicitCategory || classifySituationCategory(message);
+
+    // 2. Gather verified sources: combine library approved sources + user attached sources
+    const allApprovedSources: SharedLegalSourceRecord[] = [];
+    for (const src of legalSourcesStore.values()) {
+      if (src.status === 'ADMIN_APPROVED') {
+        allApprovedSources.push(src);
+      }
+    }
+
+    const combinedSourcesMap = new Map<string, SharedLegalSourceRecord>();
+    for (const src of allApprovedSources) {
+      combinedSourcesMap.set(src.id, src);
+    }
+    for (const src of filterToAuthoritativeSources(incomingSources)) {
+      if (src.id && !combinedSourcesMap.has(src.id)) {
+        combinedSourcesMap.set(src.id, {
+          id: src.id,
+          title: src.title || 'User Legal Source',
+          citation: src.citation || '',
+          court: src.court || 'Court of Record',
+          date: src.judgmentDate || src.date || new Date().toISOString().split('T')[0],
+          status: 'ADMIN_APPROVED',
+          sourceType: src.sourceType || 'judgment',
+          rawText: src.rawText || src.content || '',
+          uploadedBy: src.userId || 'user',
+          uploadedAt: src.createdAt || Date.now(),
+          isVerified: true,
+          statutesReferenced: src.statutesReferenced || [],
+          keyTopics: src.keyTopics || [],
+          category: src.category,
+          adminReviewNotes: src.adminReviewNotes || 'Verified user source.',
+        });
+      }
+    }
+
+    let candidateSources = Array.from(combinedSourcesMap.values());
+
+    // Category Scoping (Feature 4): Narrow retrieval scope by category to reduce vector/search space
+    let scopedByCategory = false;
+    if (detectedCategory && detectedCategory !== 'GENERAL_LEGAL') {
+      const filtered = candidateSources.filter(s => s.category === detectedCategory);
+      if (filtered.length > 0) {
+        candidateSources = filtered;
+        scopedByCategory = true;
+      }
+    }
+
+    // 3. Deduplicate at the judgment level & score canonical judgments
+    const canonicalJudgments = canonicalizeAndDeduplicateJudgments(candidateSources);
+    const queryConcepts = extractLegalQueryConcepts(message);
+    const candidateJudgments: ScoredCanonicalJudgment[] = canonicalJudgments.map(canonical =>
+      scoreCanonicalJudgmentAgainstQuery(canonical, message, 'free_text', queryConcepts)
+    );
+    candidateJudgments.sort((a, b) => b.overallScore - a.overallScore);
+
+    // 4. Feature 1: Citation Confidence Display Calculation
+    // Bands: > 0.85 = High, 0.65 - 0.85 = Medium, < 0.65 = Low
+    const topCandidate = candidateJudgments.length > 0 ? candidateJudgments[0] : null;
+    let confidenceLabel: 'High' | 'Medium' | 'Low' = 'Low';
+    let confidenceScore = 0.45;
+    let topSource = 'General Legal Principles';
+    let topCitation = 'Statutory Provisions';
+    const lowConfidenceDisclaimer = 'Is jawab ki reliability kam hai — kisi advocate se confirm karein.';
+
+    if (topCandidate && topCandidate.overallScore > 0) {
+      confidenceScore = Math.min(1.0, Math.max(0.0, topCandidate.overallScore / 100));
+      if (confidenceScore >= 0.85) {
+        confidenceLabel = 'High';
+      } else if (confidenceScore >= 0.65) {
+        confidenceLabel = 'Medium';
+      } else {
+        confidenceLabel = 'Low';
+      }
+      topSource = topCandidate.canonical.caseName;
+      topCitation = topCandidate.canonical.primaryCitation;
+    }
+
+    const citationConfidence = {
+      confidence_score: confidenceScore,
+      confidence_label: confidenceLabel,
+      source: topSource,
+      citation: topCitation,
+      disclaimer: confidenceLabel === 'Low' ? lowConfidenceDisclaimer : undefined,
+    };
+
+    // 5. Feature 2: Next-Step Action Block
+    const actionTemplate = ACTION_TEMPLATES[detectedCategory] || null;
+    const actionBlock = actionTemplate ? {
+      category: actionTemplate.category,
+      templateName: actionTemplate.templateName,
+      authority: actionTemplate.authority,
+      forum: actionTemplate.forum,
+      steps: actionTemplate.steps,
+      draftTitle: actionTemplate.draftTitle,
+      draftSnippet: actionTemplate.draftSnippet,
+      actionType: actionTemplate.actionType,
+    } : null;
+
+    // 6. Build Grounding Context from top retrieved canonical judgments
+    const topGroundingJudgments = candidateJudgments.slice(0, 3);
     let sourcesContext = '';
-    if (sources.length === 0) {
-      sourcesContext = 'NO VERIFIED SOURCES ATTACHED. Remember: You MUST NOT generate any case laws, citations, or legal authorities from model memory.';
+    if (topGroundingJudgments.length === 0) {
+      sourcesContext = 'NO VERIFIED SOURCES MATCHED THIS QUERY. You MUST state that no matching verified precedent was found in the NyayaTrace library.';
     } else {
-      sourcesContext = sources.map((s, idx) => {
-        return `--- [SOURCE DOCUMENT ${idx + 1}] ---
-ID: ${s.id || `doc-${idx}`}
-Title / Case Name: ${s.title || 'Untitled Document'}
-Official Citation: ${s.citation || 'Not provided'}
-Court / Forum: ${s.court || 'Not specified'}
-Date: ${s.date || 'Not specified'}
-Verification Status: ${s.status === 'ADMIN_APPROVED' ? 'ADMIN_APPROVED (Official Library)' : (s.verificationStatus || 'Verified')}
-Full Source Verbatim Text:
-${(s.rawText || s.content || '').slice(0, 15000)}
+      sourcesContext = topGroundingJudgments.map((cj, idx) => {
+        return `--- [AUTHENTIC JUDGMENT ${idx + 1}] ---
+Case Name: ${cj.canonical.caseName}
+Official Citation: ${cj.canonical.primaryCitation}
+Alternate Citations: ${cj.canonical.allCitations.join(', ')}
+Court: ${cj.canonical.court}
+Date: ${cj.canonical.date}
+Bench Strength: ${cj.canonical.benchStrength}
+Overall Relevance Match: ${cj.overallScore}% (Issue: ${cj.issueScore}%, Authority: ${cj.authorityScore}%, Facts: ${cj.factScore}%)
+Verified Verbatim Passage:
+"${cj.bestPassage}"
+Full Authenticated Source Text Excerpt:
+${cj.canonical.combinedRawText.slice(0, 8000)}
 -------------------------------------`;
       }).join('\n\n');
     }
@@ -2078,22 +2334,90 @@ USER'S INQUIRY / LEGAL PROPOSITION:
 
 INSTRUCTIONS FOR GENERATING THE RESPONSE:
 1. Ground your entire legal response exclusively on the text from the source documents provided above.
-2. If the user asks for a case or precedent not in the source documents above, state verbatim:
+2. Cite the exact case name (${topSource}) and official citation (${topCitation}) when explaining the legal rule.
+3. If the user asks for a case or precedent not in the source documents above, state verbatim:
    "No verified judgment was found in the available legal sources. NyayaTrace will not generate or invent a legal authority."
-3. Label sections explicitly using [SOURCE-BACKED INFORMATION], [AI ANALYSIS & REASONING], and [UNVERIFIED].`;
+4. Label sections explicitly using [SOURCE-BACKED INFORMATION], [AI ANALYSIS & REASONING], and [UNVERIFIED].`;
 
-    const result = await generateContentWithFallback(fullPrompt, undefined, history);
+    let replyText = '';
+    let modelUsed = 'deterministic-grounded-engine';
+
+    try {
+      const result = await generateContentWithFallback(fullPrompt, undefined, history);
+      replyText = result.text;
+      modelUsed = result.modelUsed;
+    } catch (err: any) {
+      console.warn('[CHAT] Model fallback to deterministic response:', err?.message || err);
+      if (topCandidate) {
+        replyText = `### [SOURCE-BACKED INFORMATION]
+Under the authoritative ruling of the ${topCandidate.canonical.court} in **${topCandidate.canonical.caseName}** (${topCandidate.canonical.primaryCitation}):
+"${topCandidate.bestPassage}"
+
+### [AI ANALYSIS & REASONING]
+The core ratio of this decision directly addresses your proposition. The precedent establishes binding authority on ${topCandidate.canonical.keyTopics.join(', ')}.
+
+### [UNVERIFIED]
+Procedural timelines, local court fees, and individual registry filing procedures may vary depending on local rules and specific jurisdiction.`;
+      } else {
+        replyText = `No verified judgment was found in the available legal sources for this inquiry. NyayaTrace will not generate or invent a legal authority.`;
+      }
+    }
+
+    // Prepend low confidence disclaimer if Low
+    if (confidenceLabel === 'Low' && !replyText.includes('Is jawab ki reliability kam hai')) {
+      replyText = `⚠️ **Is jawab ki reliability kam hai — kisi advocate se confirm karein.**\n\n${replyText}`;
+    }
+
+    // Feature 3: Zero-Retention in-memory tracking
+    if (isZeroRetention && sessionId) {
+      const existing = ephemeralSessionsStore.get(sessionId) || {
+        id: sessionId,
+        messages: [],
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 3600000,
+      };
+      existing.messages.push({
+        id: `msg_${Date.now()}_user`,
+        role: 'user',
+        content: message,
+        timestamp: Date.now(),
+      });
+      existing.messages.push({
+        id: `msg_${Date.now()}_model`,
+        role: 'model',
+        content: replyText,
+        citationConfidence,
+        actionBlock,
+        category: detectedCategory,
+        timestamp: Date.now(),
+      });
+      existing.expiresAt = Date.now() + 3600000;
+      ephemeralSessionsStore.set(sessionId, existing);
+    }
 
     res.json({
-      reply: result.text,
-      modelUsed: result.modelUsed,
-      verifiedSourcesUsed: sources.length,
+      reply: replyText,
+      modelUsed,
+      verifiedSourcesUsed: candidateSources.length,
+      citationConfidence,
+      actionBlock,
+      category: detectedCategory,
+      scopedByCategory,
+      isZeroRetention,
       timestamp: Date.now(),
     });
   } catch (error: any) {
     console.error('Error in /api/nyaya/chat:', error);
     res.status(500).json({ error: error.message || 'Failed to process legal research query.' });
   }
+});
+
+app.get('/api/nyaya/action-templates', (req, res) => {
+  const category = typeof req.query.category === 'string' ? req.query.category.trim() : undefined;
+  if (category && ACTION_TEMPLATES[category]) {
+    return res.json({ template: ACTION_TEMPLATES[category] });
+  }
+  res.json({ templates: ACTION_TEMPLATES });
 });
 
 // =========================================================================
@@ -2160,8 +2484,35 @@ app.post('/api/nyaya/fact-search', requireAuthOrGuest, async (req, res) => {
       });
     }
 
+    // 1. Situation Category Scoping (Feature 4)
+    const explicitCategory = (typeof body.category === 'string' && body.category.trim()) ? body.category.trim() : null;
+    const detectedCategory = explicitCategory || classifySituationCategory(query);
+
+    let searchPool = availableSources;
+    let scopedByCategory = false;
+    if (detectedCategory && detectedCategory !== 'GENERAL_LEGAL') {
+      const categoryScoped = availableSources.filter(s => s.category === detectedCategory);
+      if (categoryScoped.length > 0) {
+        searchPool = categoryScoped;
+        scopedByCategory = true;
+      }
+    }
+
+    // Prepare Action Block (Feature 2)
+    const actionTemplate = ACTION_TEMPLATES[detectedCategory] || null;
+    const actionBlock = actionTemplate ? {
+      category: actionTemplate.category,
+      templateName: actionTemplate.templateName,
+      authority: actionTemplate.authority,
+      forum: actionTemplate.forum,
+      steps: actionTemplate.steps,
+      draftTitle: actionTemplate.draftTitle,
+      draftSnippet: actionTemplate.draftSnippet,
+      actionType: actionTemplate.actionType,
+    } : null;
+
     // 2. Perform Multi-Signal Judgment Canonicalization & Retrieval
-    const canonicalJudgments = canonicalizeAndDeduplicateJudgments(availableSources);
+    const canonicalJudgments = canonicalizeAndDeduplicateJudgments(searchPool);
     const queryConcepts = extractLegalQueryConcepts(query);
     
     // Score each unique canonical judgment (consolidating all chunks and citations)
@@ -2204,6 +2555,10 @@ app.post('/api/nyaya/fact-search', requireAuthOrGuest, async (req, res) => {
         evidenceSufficiency: 'none',
         systemNotice: 'No matching judgment was found in the approved legal source library. NyayaTrace strictly refrains from fabricating legal authorities.',
         searchedSourcesCount: availableSources.length,
+        category: detectedCategory,
+        scopedByCategory,
+        actionBlock,
+        citationConfidence: null,
       });
     }
 
@@ -2502,6 +2857,21 @@ Return valid JSON with schema:
       }
     }
 
+    const topResult = processedResults[0];
+    let citationConfidence = null;
+    if (topResult) {
+      const score = topResult.overallRelevanceScore;
+      const confScore = Math.min(1.0, Math.max(0.0, score / 100));
+      const confLabel = confScore >= 0.85 ? 'High' : confScore >= 0.65 ? 'Medium' : 'Low';
+      citationConfidence = {
+        confidence_score: confScore,
+        confidence_label: confLabel,
+        source: topResult.caseName,
+        citation: topResult.citation,
+        disclaimer: confLabel === 'Low' ? 'Is jawab ki reliability kam hai — kisi advocate se confirm karein.' : undefined
+      };
+    }
+
     res.json({
       searchMode,
       query,
@@ -2513,6 +2883,10 @@ Return valid JSON with schema:
       modelUsed,
       searchedSourcesCount: availableSources.length,
       canonicalJudgmentsCount: canonicalJudgments.length,
+      citationConfidence,
+      actionBlock,
+      category: detectedCategory,
+      scopedByCategory,
     });
   } catch (error: any) {
     console.error('Error in /api/nyaya/fact-search:', error);

@@ -33,7 +33,10 @@ import {
   Building2,
   Calendar,
   Compass,
-  HelpCircle
+  HelpCircle,
+  Shield,
+  Lock,
+  Copy
 } from 'lucide-react';
 import type { 
   ResearchSession, 
@@ -44,7 +47,10 @@ import type {
   FactSearchResult,
   FactSearchResponse,
   FactSearchFilter,
-  ExtractedFactElements
+  ExtractedFactElements,
+  CitationConfidence,
+  ActionBlock,
+  SituationCategory
 } from '../types';
 import { getTranslation } from '../lib/i18n';
 import { FreeTextSearchCard } from './FreeTextSearchCard';
@@ -55,7 +61,7 @@ import { SummarizeJudgmentModal } from './SummarizeJudgmentModal';
 interface ResearchAssistantCanvasProps {
   currentSession: ResearchSession;
   sources: SourceDocument[];
-  onSendMessage: (text: string) => Promise<void>;
+  onSendMessage: (text: string, category?: string, isZeroRetention?: boolean) => Promise<void>;
   isLoading: boolean;
   onSaveFinding: (title: string, text: string, sourceLocation?: string) => Promise<void>;
   onNewSession: () => void;
@@ -108,6 +114,14 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
   // Finding Saved Feedback
   const [savedId, setSavedId] = useState<string | null>(null);
 
+  // Features 1-4 State
+  const [isZeroRetention, setIsZeroRetention] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<SituationCategory | null>(null);
+  const [searchConfidence, setSearchConfidence] = useState<CitationConfidence | null>(null);
+  const [searchActionBlock, setSearchActionBlock] = useState<ActionBlock | null>(null);
+  const [searchCategory, setSearchCategory] = useState<string | null>(null);
+  const [copiedNotice, setCopiedNotice] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const t = getTranslation(language);
 
@@ -158,6 +172,8 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
           sources,
           filters,
           language,
+          category: selectedCategory || undefined,
+          isZeroRetention,
         }),
       });
 
@@ -168,6 +184,9 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
 
       const data: FactSearchResponse = await response.json();
       setExtractedFacts(data.extractedFacts || null);
+      setSearchConfidence(data.citationConfidence || null);
+      setSearchActionBlock(data.actionBlock || null);
+      setSearchCategory(data.category || null);
       
       // Apply client-side minRelevance filter if set
       let filteredResults = data.results || [];
@@ -194,13 +213,206 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
     if (!chatInput.trim() || isLoading) return;
     const text = chatInput.trim();
     setChatInput('');
-    await onSendMessage(text);
+    await onSendMessage(text, selectedCategory || undefined, isZeroRetention);
   };
 
   const handleSaveFindingClick = async (title: string, text: string, location: string, id: string) => {
     await onSaveFinding(title, text, location);
     setSavedId(id);
     setTimeout(() => setSavedId(null), 3000);
+  };
+
+  // Feature 4: Guided Situations Configuration
+  const GUIDED_SITUATIONS: Array<{
+    id: SituationCategory;
+    title: string;
+    icon: string;
+    badge: string;
+    description: string;
+    sampleQuery: string;
+    suggestedProvision: string;
+  }> = [
+    {
+      id: 'CRIMINAL_ARREST',
+      title: 'Arrest & Sec 41A Notice',
+      icon: '🚨',
+      badge: 'Criminal Procedure',
+      description: 'Mandatory Section 41A CrPC notice and safeguards against arbitrary arrest',
+      sampleQuery: 'Can police arrest an accused without Section 41A CrPC notice when offense is punishable up to 7 years?',
+      suggestedProvision: 'Section 41, 41A CrPC; Arnesh Kumar v. State of Bihar',
+    },
+    {
+      id: 'CONSUMER_DISPUTE',
+      title: 'Defective Product & Refund',
+      icon: '🛒',
+      badge: 'Consumer Rights',
+      description: 'E-commerce refund refusal, defective appliances, and unfair trade practice',
+      sampleQuery: 'E-commerce platform refused refund for defective smartphone delivered in damaged condition citing no-return policy',
+      suggestedProvision: 'Section 35 CPA 2019; Lucknow Development Authority v. M.K. Gupta',
+    },
+    {
+      id: 'TENANCY_PROPERTY',
+      title: 'Security Deposit Retention',
+      icon: '🏠',
+      badge: 'Tenancy Law',
+      description: 'Landlord holding deposit after peaceful handover without genuine repair bills',
+      sampleQuery: 'Landlord refused to return ₹60,000 security deposit citing arbitrary wear-and-tear painting charges after vacating',
+      suggestedProvision: 'Suresh Kumar Kohli v. Rakesh Jain (2018) 6 SCC 708',
+    },
+    {
+      id: 'LABOR_SALARY',
+      title: 'Withheld Salary & Gratuity',
+      icon: '💼',
+      badge: 'Employment Law',
+      description: 'Employer holding earned wages or gratuity post-resignation without inquiry',
+      sampleQuery: 'Employer withheld last two months earned wages and gratuity after resignation without formal disciplinary inquiry',
+      suggestedProvision: 'Article 300A; State of Jharkhand v. Jitendra Kumar Srivastava',
+    },
+    {
+      id: 'CONSTITUTIONAL_LAW',
+      title: 'Privacy & Due Process',
+      icon: '⚖️',
+      badge: 'Constitutional',
+      description: 'State data collection, arbitrary detention, and proportionality test',
+      sampleQuery: 'State mandatory biometric linking challenged under fundamental right to privacy and proportionality test',
+      suggestedProvision: 'Article 21; Justice K.S. Puttaswamy v. Union of India',
+    },
+  ];
+
+  // Feature 1: Citation Confidence Badge Renderer
+  const renderConfidenceBadge = (conf?: CitationConfidence) => {
+    if (!conf) return null;
+    const isHigh = conf.confidence_label === 'High';
+    const isMedium = conf.confidence_label === 'Medium';
+    const isLow = conf.confidence_label === 'Low';
+    const pct = Math.round(conf.confidence_score * (conf.confidence_score <= 1.0 ? 100 : 1));
+
+    return (
+      <div className="space-y-2 font-sans mb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border tracking-wide uppercase ${
+              isHigh
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                : isMedium
+                ? 'bg-amber-50 text-amber-800 border-amber-300'
+                : 'bg-rose-50 text-rose-800 border-rose-300'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${isHigh ? 'bg-emerald-600' : isMedium ? 'bg-amber-600' : 'bg-rose-600'}`} />
+            Citation Confidence: {conf.confidence_label} ({pct}%)
+          </span>
+
+          {conf.source && conf.source !== 'General Legal Principles' && (
+            <span className="text-[11px] font-mono text-stone-700 bg-stone-100 px-2.5 py-0.5 rounded-lg border border-stone-200">
+              {conf.source} {conf.citation ? `• ${conf.citation}` : ''}
+            </span>
+          )}
+        </div>
+
+        {/* Feature 1 Mandatory Low Confidence Disclaimer */}
+        {isLow && (
+          <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-950 flex items-start gap-2.5 shadow-xs">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="font-bold text-rose-900">
+                {conf.disclaimer || 'Is jawab ki reliability kam hai — kisi advocate se confirm karein.'}
+              </p>
+              <p className="text-[11px] text-rose-700">
+                Vector similarity and retrieval match for this proposition is below the 0.65 threshold. Please verify statutory provisions and judicial ratios before formal reliance.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Feature 2: Next-Step Action Block Renderer
+  const renderActionBlock = (actionBlock?: ActionBlock) => {
+    if (!actionBlock) return null;
+    return (
+      <div className="mt-3.5 p-4 bg-stone-50 rounded-2xl border border-stone-300 text-stone-900 space-y-3 font-sans shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-2.5">
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+              Next-Step Action Block
+            </span>
+            <h5 className="text-sm font-bold font-serif text-stone-900">
+              {actionBlock.templateName}
+            </h5>
+          </div>
+          <span className="text-[10px] font-mono text-stone-500 uppercase bg-white px-2 py-0.5 rounded border border-stone-200">
+            {actionBlock.actionType || 'Pre-Litigation Action'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+          <div className="bg-white p-2.5 rounded-xl border border-stone-200">
+            <span className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold block">
+              Authority to Approach:
+            </span>
+            <p className="font-semibold text-stone-800 mt-0.5">{actionBlock.authority}</p>
+          </div>
+          <div className="bg-white p-2.5 rounded-xl border border-stone-200">
+            <span className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold block">
+              Competent Forum:
+            </span>
+            <p className="font-semibold text-stone-800 mt-0.5">{actionBlock.forum}</p>
+          </div>
+        </div>
+
+        {actionBlock.steps && actionBlock.steps.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-stone-700 uppercase tracking-wider block">
+              Recommended Statutory Steps:
+            </span>
+            <ol className="space-y-1 text-xs text-stone-700 list-decimal list-inside pl-1">
+              {actionBlock.steps.map((step, sIdx) => (
+                <li key={sIdx} className="leading-relaxed">
+                  <span className="text-stone-800 font-medium">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
+        {actionBlock.draftSnippet && (
+          <div className="bg-white p-3 rounded-xl border border-stone-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-amber-600" />
+                {actionBlock.draftTitle || 'Ready-to-Use Legal Notice Draft'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(actionBlock.draftSnippet || '');
+                  setCopiedNotice(actionBlock.templateName);
+                  setTimeout(() => setCopiedNotice(null), 2500);
+                }}
+                className="inline-flex items-center space-x-1 px-3 py-1 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-stone-950 transition-colors cursor-pointer"
+              >
+                {copiedNotice === actionBlock.templateName ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy Draft Notice</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="font-mono text-[11px] text-stone-600 bg-stone-50 p-3 rounded-lg border border-stone-200 whitespace-pre-wrap select-all leading-relaxed">
+              {actionBlock.draftSnippet}
+            </p>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Preset Inquiries
@@ -269,6 +481,118 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
             <Plus className="w-4 h-4 text-amber-400" />
             <span>New Research Topic</span>
           </button>
+        </div>
+      </div>
+
+      {/* Feature 3 & Feature 4 Control Bar */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* Feature 3: Zero-Retention Privacy Toggle */}
+        <div className="bg-white p-4 rounded-2xl border border-stone-200 shadow-xs flex flex-col justify-between space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start space-x-2.5">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${isZeroRetention ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-600'}`}>
+                {isZeroRetention ? <Shield className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+              </div>
+              <div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs font-bold text-stone-900">Zero-Retention Privacy</span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isZeroRetention ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-stone-100 text-stone-600'}`}>
+                    {isZeroRetention ? 'Active' : 'Off'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  Aapki sensitive queries save nahi hoti jab tak aap na chahein.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsZeroRetention(!isZeroRetention)}
+              aria-label="Toggle Zero-Retention Privacy"
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${isZeroRetention ? 'bg-emerald-600' : 'bg-stone-300'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${isZeroRetention ? 'translate-x-5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
+
+          <div className="text-[10px] text-stone-500 bg-stone-50 p-2 rounded-lg border border-stone-200 flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+            <span>
+              {isZeroRetention
+                ? 'Queries are processed in temporary RAM (1h TTL) with zero persistent Firestore logging.'
+                : 'Queries & findings are securely archived in your private research vault.'}
+            </span>
+          </div>
+        </div>
+
+        {/* Feature 4: Situation-Based Guided Flows */}
+        <div className="lg:col-span-2 bg-white p-4 rounded-2xl border border-stone-200 shadow-xs space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Compass className="w-4 h-4 text-amber-600" />
+              <span className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+                Situation-Based Guided Flows
+              </span>
+              <span className="text-[10px] text-stone-500 hidden sm:inline">
+                (Narrows RAG vector search scope)
+              </span>
+            </div>
+            {selectedCategory && (
+              <button
+                type="button"
+                onClick={() => setSelectedCategory(null)}
+                className="text-xs text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 cursor-pointer bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 transition-colors"
+              >
+                <X className="w-3 h-3" />
+                <span>Clear Scoped Scope</span>
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+            {GUIDED_SITUATIONS.map((sit) => {
+              const isSelected = selectedCategory === sit.id;
+              return (
+                <button
+                  key={sit.id}
+                  type="button"
+                  onClick={() => {
+                    if (isSelected) {
+                      setSelectedCategory(null);
+                    } else {
+                      setSelectedCategory(sit.id);
+                      setSearchQuery(sit.sampleQuery);
+                      setPlainInput(sit.sampleQuery);
+                      setFactInput(sit.sampleQuery);
+                      setLegalProvisionFilter(sit.suggestedProvision);
+                      setSearchMode('free_text');
+                      setActiveTab('search');
+                    }
+                  }}
+                  className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between space-y-1 ${
+                    isSelected
+                      ? 'bg-amber-500/15 border-amber-500 shadow-xs ring-1 ring-amber-500'
+                      : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-base">{sit.icon}</span>
+                    <span className={`text-[8px] font-bold px-1 py-0.5 rounded uppercase ${isSelected ? 'bg-amber-500 text-stone-950' : 'bg-stone-200 text-stone-700'}`}>
+                      {sit.badge}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-stone-900 leading-tight">
+                      {sit.title}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -622,6 +946,12 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
                     </span>
                   </div>
 
+                  {/* Feature 1: Citation Confidence for Retrieval */}
+                  {searchConfidence && renderConfidenceBadge(searchConfidence)}
+
+                  {/* Feature 2: Next-Step Action Block */}
+                  {searchActionBlock && renderActionBlock(searchActionBlock)}
+
                   {/* Result Cards Grid */}
                   <div className="space-y-4">
                     {factSearchResults.map((result) => {
@@ -866,7 +1196,62 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
 
       {/* Interactive Chat Dialogue Tab */}
       {activeTab === 'chat' && (
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm flex flex-col h-[600px] overflow-hidden">
+        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm flex flex-col h-[650px] overflow-hidden">
+          {/* Chat Top Controls Header */}
+          <div className="px-5 py-3 border-b border-stone-200 bg-stone-50/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center space-x-2.5">
+              <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isZeroRetention ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700'}`}>
+                {isZeroRetention ? <Shield className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+              </div>
+              <div>
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-xs font-bold text-stone-900">
+                    {isZeroRetention ? 'Zero-Retention Mode Active' : 'Standard Session Mode'}
+                  </span>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                    isZeroRetention ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-stone-200 text-stone-700'
+                  }`}>
+                    {isZeroRetention ? 'Ephemeral' : 'Vault Saved'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-stone-500">
+                  {isZeroRetention 
+                    ? 'Aapki sensitive queries save nahi hoti jab tak aap na chahein.' 
+                    : 'Session dialogues are securely recorded in your research vault.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {selectedCategory && (
+                <div className="flex items-center gap-1 bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg text-xs font-bold border border-amber-300">
+                  <span>Scoped: {GUIDED_SITUATIONS.find(s => s.id === selectedCategory)?.title || selectedCategory}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedCategory(null)}
+                    className="hover:text-amber-950 ml-1 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* Quick Zero-Retention Toggle in Chat */}
+              <button
+                type="button"
+                onClick={() => setIsZeroRetention(!isZeroRetention)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  isZeroRetention 
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700' 
+                    : 'bg-white hover:bg-stone-100 text-stone-700 border-stone-300'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>{isZeroRetention ? 'Zero-Retention ON' : 'Enable Zero-Retention'}</span>
+              </button>
+            </div>
+          </div>
+
           <div className="flex-1 p-6 overflow-y-auto space-y-6">
             {currentSession.messages.length === 0 ? (
               <div className="h-full flex flex-col justify-center items-center text-center space-y-4 max-w-md mx-auto">
@@ -903,6 +1288,9 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
                           : 'bg-stone-50 text-stone-900 border border-stone-200 rounded-bl-xs'
                       }`}
                     >
+                      {/* Feature 1: Citation Confidence Badge on Assistant Replies */}
+                      {!isUser && renderConfidenceBadge(msg.citationConfidence)}
+
                       <div className="whitespace-pre-line font-serif text-xs sm:text-sm">
                         {msg.content}
                       </div>
@@ -928,6 +1316,9 @@ export const ResearchAssistantCanvas: React.FC<ResearchAssistantCanvasProps> = (
                           </div>
                         </div>
                       )}
+
+                      {/* Feature 2: Next-Step Action Block on Assistant Replies */}
+                      {!isUser && renderActionBlock(msg.actionBlock)}
                     </div>
                   </div>
                 );
